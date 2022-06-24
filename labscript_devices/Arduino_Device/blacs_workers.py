@@ -201,7 +201,7 @@ class Arduino_Device_Worker(Worker):
    #              print("Attempting Retry", attempts, "...")
    #              if attempts >= self.max_attempts:
    #                  print("No success after maximum attempts!")
-   #                  msg = "Communcation with the arduino has failed upon intial packet grabbing times! Check the connection!!"
+   #                  msg = "Communcation with the arduino has failed upon intial packet grabbing! Check the connection!!"
    #                  raise CallError(msg)
    #                  break
    #      print('Grabbed initial value packet')
