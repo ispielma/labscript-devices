@@ -493,8 +493,11 @@ class PrawnBlasterWorker(Worker):
         if self.wait_table is not None:
             with h5py.File(self.h5_file, "a") as hdf5_file:
                 # Work out how long the waits were, save em, post an event saying so
+                # "S" rather than the "a" this used to say: "a" was only ever
+                # an alias for it, and numpy 2.0 removed the alias. Same bytes
+                # on disk, so earlier shot files still read back.
                 dtypes = [
-                    ("label", "a256"),
+                    ("label", "S256"),
                     ("time", float),
                     ("timeout", float),
                     ("duration", float),

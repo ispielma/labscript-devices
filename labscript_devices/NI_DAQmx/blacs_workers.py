@@ -952,8 +952,11 @@ class NI_DAQmxWaitMonitorWorker(Worker):
             waits_timed_out = wait_durations > self.wait_table['timeout']
 
             # Work out how long the waits were, save them, post an event saying so:
+            # 'S' rather than the 'a' this used to say: 'a' was only ever an
+            # alias for it, and numpy 2.0 removed the alias. Same bytes on
+            # disk, so shot files written by earlier versions still read back.
             dtypes = [
-                ('label', 'a256'),
+                ('label', 'S256'),
                 ('time', float),
                 ('timeout', float),
                 ('duration', float),
