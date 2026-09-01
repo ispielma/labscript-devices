@@ -104,7 +104,10 @@ class Camera(TriggerableDevice):
                         
     def generate_code(self, hdf5_file):
         self.do_checks()
-        table_dtypes = [('name','a256'), ('time',float), ('frametype','a256'), ('exposure_time',float)]
+        # 'S' rather than the 'a' this used to say: 'a' was only ever an alias
+        # for it, and numpy 2.0 removed the alias. Same bytes on disk, so shot
+        # files written by earlier versions still read back.
+        table_dtypes = [('name','S256'), ('time',float), ('frametype','S256'), ('exposure_time',float)]
         data = np.array(self.exposures,dtype=table_dtypes)
 
         group = self.init_device_group(hdf5_file)
