@@ -177,12 +177,14 @@ class RFBlaster(PseudoclockDevice):
                 # Save the binary to the h5 file:
                 with open(temp_binary_filepath,'rb') as binary_file:
                     binary_data = binary_file.read()
-                # has to be numpy.string_ (string_ in this namespace,
-                # imported from pylab) as python strings get stored
-                # as h5py as 'variable length' strings, which 'cannot
+                # has to be np.bytes_ as python strings get stored
+                # by h5py as 'variable length' strings, which 'cannot
                 # contain embedded nulls'. Presumably our binary data
                 # must contain nulls sometimes. So this crashes if we
-                # don't convert to a numpy 'fixes length' string:
+                # don't convert to a numpy 'fixed length' string. (This
+                # comment used to name numpy.string_, which numpy 2.0
+                # removed; np.bytes_ is the same type under the name
+                # that survived.)
                 binary_group.create_dataset('DDS%d'%dds, data=np.bytes_(binary_data))
             finally:
                 # Delete the temporary files:
