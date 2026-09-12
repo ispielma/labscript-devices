@@ -23,13 +23,11 @@ lives in a conftest rather than a fixture: pytest imports conftest first.
 `setdefault` leaves an explicit choice alone, so anyone who wants to watch a
 test drive a real widget can export `QT_QPA_PLATFORM` themselves.
 
-Careful with the escape hatch: `labscript_utils.excepthook` reads this as
-`bool(os.environ.get(...))`, so *any* non-empty value suppresses the dialog --
-`LABSCRIPT_NO_ERROR_DIALOG=0` suppresses it exactly as `=1` does. `setdefault`
-will not overwrite an explicit setting, but the only settings that restore the
-dialog are the empty string or unsetting the variable. Someone writing a test
-of the dialog will reach for `=0`, get no dialog, and have no reason to suspect
-the environment.
+`setdefault` leaves an explicit setting alone, and an explicit setting now means
+what it looks like: `LABSCRIPT_NO_ERROR_DIALOG=0` keeps the dialog on, as do
+`false`, `no`, `off` and the empty string. That was not true before `8719676` --
+the variable was read for bare truthiness, so `=0` suppressed the dialog exactly
+as `=1` did.
 
 A test *of* the error dialog should set
 `labscript_utils.excepthook.NO_ERROR_DIALOG` directly for its own duration
