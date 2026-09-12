@@ -27,12 +27,9 @@ still assign `NO_ERROR_DIALOG` directly at any point.
 `setdefault` leaves an explicit choice alone, so anyone who wants to watch a
 test drive a real widget can export `QT_QPA_PLATFORM` themselves.
 
-`setdefault` leaves an explicit setting alone, and an explicit setting now means
-what it looks like: `LABSCRIPT_NO_ERROR_DIALOG=0` keeps the dialog on, as do
-`false`, `no`, `off` and the empty string. That was not true before `ae73495`
-"Let LABSCRIPT_NO_ERROR_DIALOG=0 mean what it looks like" --
-the variable was read for bare truthiness, so `=0` suppressed the dialog exactly
-as `=1` did.
+`setdefault` leaves an explicit setting alone, and an explicit setting means what
+it looks like: `LABSCRIPT_NO_ERROR_DIALOG=0` keeps the dialog on, as do `false`,
+`no`, `off` and the empty string. Anything else suppresses it.
 
 A test *of* the error dialog should set
 `labscript_utils.excepthook.NO_ERROR_DIALOG` directly for its own duration
