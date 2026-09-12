@@ -18,8 +18,12 @@ not depend on remembering two environment variables. They affect test runs only
 — a real run does not import this file, so the error dialog still appears where
 it is meant to, which is the rule the workspace `AGENTS.md` guards.
 
-The platform setting must be made before qtutils imports Qt, which is why it
-lives in a conftest rather than a fixture: pytest imports conftest first.
+Both must be set before the module that reads each is imported, which is why
+this is a conftest rather than a fixture: pytest imports conftest first. The
+platform setting has to beat qtutils importing Qt. The dialog setting has to
+beat `labscript_utils.excepthook`, which captures the environment once at module
+scope -- setting the variable after that import does nothing, though a test can
+still assign `NO_ERROR_DIALOG` directly at any point.
 `setdefault` leaves an explicit choice alone, so anyone who wants to watch a
 test drive a real widget can export `QT_QPA_PLATFORM` themselves.
 
