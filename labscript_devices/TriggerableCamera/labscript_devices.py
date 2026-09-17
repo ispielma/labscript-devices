@@ -29,7 +29,6 @@ class TriggerableCamera(TriggerableDevice):
                 "pixel_size",
                 "magnification",
                 "manual_mode_camera_attributes",
-                "mock",
             ],
             "device_properties": [
                 "camera_attributes",
@@ -56,7 +55,6 @@ class TriggerableCamera(TriggerableDevice):
         stop_acquisition_timeout=5.0,
         exception_on_failed_shot=True,
         saved_attribute_visibility_level='intermediate',
-        mock=False,
         **kwargs
     ):
         """A camera triggered by a digital edge.
@@ -151,10 +149,6 @@ class TriggerableCamera(TriggerableDevice):
                 end of each shot. If None, no attributes will be saved. Must be one of
                 `'simple'`, `'intermediate'`, `'advanced'`, or `None`. If `None`, no
                 attributes will be saved.
-
-            mock (bool, optional), default: False
-                For testing purpses, simulate a camera with fake data instead of
-                communicating with actual hardware.
 
             **kwargs: Further keyword arguments to be passed to the `__init__` method of
                 the parent class (TriggerableDevice).

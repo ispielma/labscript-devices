@@ -30,11 +30,6 @@ from labscript_devices.DummyCamera.blacs_workers import (
     DummyCameraWorker,
 )
 import labscript_devices.TriggerableCamera.blacs_workers as camera_workers
-from labscript_devices.TriggerableCamera.blacs_workers import MockCamera
-from labscript_devices.IMAQdxCamera.blacs_workers import IMAQdxCameraWorker
-from labscript_devices.PylonCamera.blacs_workers import PylonCameraWorker
-from labscript_devices.SpinnakerCamera.blacs_workers import SpinnakerCameraWorker
-from labscript_devices.FlyCapture2Camera.blacs_workers import FlyCapture2CameraWorker
 
 from test_compile_device_tables import CompileTestCase
 
@@ -299,7 +294,6 @@ class SavedImageTests(DummyCameraTestCase):
         worker.orientation = None
         worker.camera_attributes = {'Width': 64, 'Height': 48}
         worker.manual_mode_camera_attributes = {}
-        worker.mock = False
         worker.parent_host = 'localhost'
         worker.image_receiver_port = 0
         with mock.patch.object(camera_workers, 'Context', AZMQContext):
@@ -396,6 +390,7 @@ class PlaybackTests(unittest.TestCase):
 
     def setUp(self):
         self.camera = Dummy_Camera(0x0)
+        self.camera.set_attributes({'Width': 5, 'Height': 4})
         self.frames = np.arange(3 * 4 * 5, dtype='uint16').reshape(3, 4, 5)
 
     def test_the_camera_returns_the_compiled_frames_one_per_grab(self):
@@ -423,12 +418,22 @@ class PlaybackTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.camera.grab()
 
-    def test_with_no_shot_loaded_it_returns_the_watermarked_mock_image(self):
-        # Manual mode: there is no shot, so there is nothing around the frame to
-        # say where it came from, and the watermark on it is what does.
+    def test_with_no_shot_loaded_it_returns_the_default_image(self):
+        # Manual mode: pressing Snap in the tab, with no shot and so no image
+        # function. It is still this camera's sensor that answers.
         image = self.camera.grab()
 
-        self.assertEqual(image.shape, (500, 500))
+        self.assertEqual(image.shape, (4, 5))
+        self.assertEqual(image.dtype, np.dtype('uint16'))
+
+    def test_a_camera_never_told_its_size_says_so(self):
+        camera = Dummy_Camera(0x0)
+
+        with self.assertRaises(ValueError) as raised:
+            camera.grab()
+
+        self.assertIn('Width', str(raised.exception))
+        self.assertIn('Height', str(raised.exception))
 
     def test_the_camera_declares_that_its_images_are_not_real_data(self):
         # This is the watermark for images that reach the shot file: an
@@ -436,26 +441,6 @@ class PlaybackTests(unittest.TestCase):
         # take, rather than pixels drawn onto the data.
         self.assertIs(self.camera.get_attribute('NOT_REAL_DATA'), True)
         self.assertIn('NOT_REAL_DATA', self.camera.get_attribute_names())
-
-
-class MockModeTests(unittest.TestCase):
-    """Every camera in the lineage still starts in mock mode."""
-
-    def test_each_camera_worker_starts_as_a_mock_camera(self):
-        workers = (
-            IMAQdxCameraWorker,
-            PylonCameraWorker,
-            SpinnakerCameraWorker,
-            FlyCapture2CameraWorker,
-        )
-        for WorkerClass in workers:
-            with self.subTest(worker=WorkerClass.__name__):
-                # get_camera reads self.mock and nothing else when mocking, so
-                # it can be exercised without a BLACS worker process.
-                worker = WorkerClass.__new__(WorkerClass)
-                worker.mock = True
-
-                self.assertIsInstance(worker.get_camera(), MockCamera)
 
 
 if __name__ == '__main__':

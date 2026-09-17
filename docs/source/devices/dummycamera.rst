@@ -13,6 +13,7 @@ script reads them exactly as it reads a real camera's.
 
 .. autosummary::
    labscript_devices.DummyCamera.labscript_devices
+   labscript_devices.DummyCamera.sensor
    labscript_devices.DummyCamera.blacs_tabs
    labscript_devices.DummyCamera.blacs_workers
 
@@ -20,8 +21,9 @@ Installation
 ~~~~~~~~~~~~
 
 No installation and no hardware. Add it to a connection table as you would any
-camera, and give it a :code:`Width` and a :code:`Height` in its
-:code:`camera_attributes`.
+camera. It has no sensor to fall back on, so its :code:`camera_attributes` must
+give it a :code:`Width` and a :code:`Height`: an image quietly the wrong size is
+worse than one that does not compile.
 
 Usage
 ~~~~~
@@ -78,9 +80,10 @@ stored anywhere -- only the images it returns are. So it can be any callable,
 including a local function or a lambda, and the machine BLACS runs on does not
 need it, even when the camera's worker is on another host.
 
-An exposure given no function gets :obj:`~labscript_devices.DummyCamera.labscript_devices.default_image`,
+An exposure given no function gets :obj:`~labscript_devices.DummyCamera.sensor.default_image`,
 a plain dip in a flat background, so that a connection table with a dummy camera
-in it compiles and runs before any model has been written.
+in it compiles and runs before any model has been written. It is also what the
+Snap button in the BLACS tab shows, where there is no shot and so no function.
 
 Noise is the function's business: the camera adds none. What the camera does add
 is a :code:`NOT_REAL_DATA` attribute beside the images in the shot file, which is
@@ -99,6 +102,12 @@ Detailed Documentation
    :private-members:
 
 .. automodule:: labscript_devices.DummyCamera.labscript_devices
+   :members:
+   :undoc-members:
+   :show-inheritance:
+   :private-members:
+
+.. automodule:: labscript_devices.DummyCamera.sensor
    :members:
    :undoc-members:
    :show-inheritance:

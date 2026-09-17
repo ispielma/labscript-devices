@@ -477,9 +477,6 @@ class FlyCapture2CameraWorker(TriggerableCameraWorker):
             visibility_level (str): Normally configures level of attribute detail
                 to return. Is not used by FlyCapture2_Camera.
         """
-        if self.mock:
-            return TriggerableCameraWorker.get_attributes_as_dict(self,visibility_level)
-        else:
-            return self.camera.get_attributes(visibility_level)
+        return self.camera.get_attributes(visibility_level)
 
 

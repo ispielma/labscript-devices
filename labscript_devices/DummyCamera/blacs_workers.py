@@ -17,21 +17,20 @@ import h5py
 
 from labscript_utils.shared_drive import path_to_local
 
+from labscript_devices.DummyCamera.sensor import default_image, sensor_grid
 from labscript_devices.TriggerableCamera.blacs_workers import (
-    MockCamera,
     TriggerableCameraWorker,
 )
 
 
-class Dummy_Camera(MockCamera):
+class Dummy_Camera(object):
     """A camera whose frames were computed when the shot was compiled.
 
-    It acquires the way any camera acquires, one frame per grab in the order the
-    triggers arrive, but the frames come from the shot file rather than from a
-    sensor. In manual mode there is no shot, so it falls back to the image
-    MockCamera returns -- the one place a frame is looked at with nothing around
-    it to say where it came from, and so the one place the watermark on that
-    image is the thing that says so.
+    It presents the interface every camera interface class presents, and
+    acquires the way any camera acquires -- one frame per grab, in the order the
+    triggers arrive -- but the frames come from the shot file rather than from a
+    sensor. In manual mode there is no shot and so no image function, and it
+    produces the default image on its own pixels instead.
     """
 
     # What marks these images as not real data once they are in the shot file.
@@ -42,15 +41,38 @@ class Dummy_Camera(MockCamera):
     identifying_attributes = {'NOT_REAL_DATA': True}
 
     def __init__(self, serial_number=None):
-        MockCamera.__init__(self)
-        self.attributes.update(self.identifying_attributes)
+        print("Starting device worker as a dummy camera")
+        self.attributes = dict(self.identifying_attributes)
+        self.exception_on_failed_shot = True
+        self._abort_acquisition = False
         self.images = None
         self.index = 0
+
+    def set_attributes(self, attributes):
+        self.attributes.update(attributes)
+
+    def get_attribute(self, name):
+        return self.attributes[name]
+
+    def get_attribute_names(self, visibility_level=None):
+        return list(self.attributes.keys())
+
+    def configure_acquisition(self, continuous=False, bufferCount=5):
+        pass
 
     def load_images(self, images):
         """Take the frames this shot compiled, to be returned one per grab."""
         self.images = images
         self.index = 0
+
+    def snap(self):
+        """A frame with no shot behind it, for manual mode.
+
+        There is no shot, so there is no image function and no imaging geometry
+        either: this is the default image on the camera's own pixels.
+        """
+        image = default_image(*sensor_grid(self.attributes))
+        return image.astype('uint16')
 
     def grab(self):
         if self.images is None:
@@ -63,6 +85,22 @@ class Dummy_Camera(MockCamera):
         image = self.images[self.index]
         self.index += 1
         return image
+
+    def grab_multiple(self, n_images, images, waitForNextBuffer=True):
+        print(f"Attempting to grab {n_images} images.")
+        for i in range(n_images):
+            images.append(self.grab())
+            print(f"Got image {i+1} of {n_images}.")
+        print(f"Got {len(images)} of {n_images} images.")
+
+    def stop_acquisition(self):
+        pass
+
+    def abort_acquisition(self):
+        self._abort_acquisition = True
+
+    def close(self):
+        pass
 
 
 class DummyCameraWorker(TriggerableCameraWorker):
