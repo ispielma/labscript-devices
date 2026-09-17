@@ -18,7 +18,7 @@
 import numpy as np
 from labscript_utils import dedent
 
-from labscript_devices.IMAQdxCamera.blacs_workers import IMAQdxCameraWorker
+from labscript_devices.TriggerableCamera.blacs_workers import TriggerableCameraWorker
 
 # Don't import API yet so as not to throw an error, allow worker to run as a dummy
 # device, or for subclasses to import this module to inherit classes without requiring API
@@ -178,10 +178,10 @@ class Pylon_Camera(object):
         self.camera.Close()
 
 
-class PylonCameraWorker(IMAQdxCameraWorker):
+class PylonCameraWorker(TriggerableCameraWorker):
     """Pylon API Camera Worker. 
     
-    Inherits from IMAQdxCameraWorker. Overloads get_attributes_as_dict 
+    Inherits from TriggerableCameraWorker. Overloads get_attributes_as_dict 
     to use PylonCamera.get_attributes() method."""
     interface_class = Pylon_Camera
 

@@ -11,7 +11,10 @@
 #                                                                   #
 #####################################################################
 from zprocess import rich_print
-from labscript_devices.IMAQdxCamera.blacs_workers import MockCamera, IMAQdxCameraWorker
+from labscript_devices.TriggerableCamera.blacs_workers import (
+    MockCamera,
+    TriggerableCameraWorker,
+)
 
 class AndorCamera(object):
 
@@ -113,7 +116,7 @@ class AndorCamera(object):
     def close(self):
         self.camera.shutdown()
 
-class AndorSolisWorker(IMAQdxCameraWorker):
+class AndorSolisWorker(TriggerableCameraWorker):
 
     interface_class = AndorCamera
 

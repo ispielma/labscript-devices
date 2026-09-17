@@ -20,7 +20,7 @@ import numpy as np
 from labscript_utils import dedent
 from enum import IntEnum
 
-from labscript_devices.IMAQdxCamera.blacs_workers import IMAQdxCameraWorker
+from labscript_devices.TriggerableCamera.blacs_workers import TriggerableCameraWorker
 
 # Don't import API yet so as not to throw an error, allow worker to run as a dummy
 # device, or for subclasses to import this module to inherit classes without requiring API
@@ -462,10 +462,10 @@ class FlyCapture2_Camera(object):
         self.camera.disconnect()
 
 
-class FlyCapture2CameraWorker(IMAQdxCameraWorker):
+class FlyCapture2CameraWorker(TriggerableCameraWorker):
     """FlyCapture2 API Camera Worker. 
     
-    Inherits from obj:`IMAQdxCameraWorker`. Defines :obj:`interface_class` and overloads
+    Inherits from obj:`TriggerableCameraWorker`. Defines :obj:`interface_class` and overloads
     :obj:`get_attributes_as_dict` to use FlyCapture2Camera.get_attributes() method."""
     interface_class = FlyCapture2_Camera
 
@@ -478,7 +478,7 @@ class FlyCapture2CameraWorker(IMAQdxCameraWorker):
                 to return. Is not used by FlyCapture2_Camera.
         """
         if self.mock:
-            return IMAQdxCameraWorker.get_attributes_as_dict(self,visibility_level)
+            return TriggerableCameraWorker.get_attributes_as_dict(self,visibility_level)
         else:
             return self.camera.get_attributes(visibility_level)
 
