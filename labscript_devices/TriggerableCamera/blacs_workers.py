@@ -28,63 +28,6 @@ from labscript_utils.shared_drive import path_to_local
 from labscript_utils.properties import set_attributes
 
 
-class MockCamera(object):
-    """Mock camera class that returns fake image data."""
-
-    def __init__(self):
-        print("Starting device worker as a mock device")
-        self.attributes = {}
-        self.exception_on_failed_shot = True
-
-    def set_attributes(self, attributes):
-        self.attributes.update(attributes)
-
-    def get_attribute(self, name):
-        return self.attributes[name]
-
-    def get_attribute_names(self, visibility_level=None):
-        return list(self.attributes.keys())
-
-    def configure_acquisition(self, continuous=False, bufferCount=5):
-        pass
-
-    def grab(self):
-        return self.snap()
-
-    def grab_multiple(self, n_images, images, waitForNextBuffer=True):
-        print(f"Attempting to grab {n_images} (mock) images.")
-        for i in range(n_images):
-            images.append(self.grab())
-            print(f"Got (mock) image {i+1} of {n_images}.")
-        print(f"Got {len(images)} of {n_images} (mock) images.")
-
-    def snap(self):
-        N = 500
-        A = 500
-        x = np.linspace(-5, 5, 500)
-        y = x.reshape((N, 1))
-        clean_image = A * (1 - 0.5 * np.exp(-(x ** 2 + y ** 2)))
-
-        # Write text on the image that says "NOT REAL DATA"
-        from PIL import Image, ImageDraw, ImageFont
-
-        font = ImageFont.load_default()
-        canvas = Image.new('L', [N // 5, N // 5], (0,))
-        draw = ImageDraw.Draw(canvas)
-        draw.text((10, 20), "NOT REAL DATA", font=font, fill=1)
-        clean_image += 0.2 * A * np.asarray(canvas.resize((N, N)).rotate(20))
-        return np.random.poisson(clean_image)
-
-    def stop_acquisition(self):
-        pass
-
-    def abort_acquisition(self):
-        pass
-
-    def close(self):
-        pass
-
-
 class TriggerableCameraWorker(Worker):
     # The camera interface class this worker drives. Subclasses name their own
     # here if it takes only the serial number as an instantiation argument,
@@ -118,10 +61,7 @@ class TriggerableCameraWorker(Worker):
         """Return an instance of the camera interface class. Subclasses may override
         this method to pass required arguments to their class if they require more
         than just the serial number."""
-        if self.mock:
-            return MockCamera()
-        else:
-            return self.interface_class(self.serial_number)
+        return self.interface_class(self.serial_number)
 
     def set_attributes_smart(self, attributes):
         """Call self.camera.set_attributes() to set the given attributes, only setting

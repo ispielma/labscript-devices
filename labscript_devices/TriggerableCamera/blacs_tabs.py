@@ -207,7 +207,6 @@ class TriggerableCameraTab(DeviceTab):
             'manual_mode_camera_attributes': connection_table_properties[
                 'manual_mode_camera_attributes'
             ],
-            'mock': connection_table_properties['mock'],
             'image_receiver_port': self.image_receiver.port,
         }
         self.create_worker(

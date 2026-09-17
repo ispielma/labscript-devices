@@ -16,30 +16,13 @@ import re
 import numpy as np
 from labscript_utils import dedent
 
+from labscript_devices.DummyCamera.sensor import default_image, sensor_grid
 from labscript_devices.TriggerableCamera.labscript_devices import TriggerableCamera
 
-
-# The sensor a DummyCamera has when its camera attributes do not give it one, which
-# is the size of the image MockCamera returns.
-DEFAULT_WIDTH = 500
-DEFAULT_HEIGHT = 500
 
 # What a pixel holds when PixelFormat does not say, and the most the shot file can
 # store in the uint16 datasets a camera's images are saved as.
 DEFAULT_BIT_DEPTH = 16
-
-
-def default_image(X, Y):
-    """The image an exposure gets when it names no function of its own.
-
-    A Gaussian dip in a flat background, so that a connection table with a dummy
-    camera in it compiles and runs before anyone has written a model. It takes
-    the arguments every image function takes and returns counts, like any other:
-    nothing about it is special to the camera.
-    """
-    background = 500.0
-    width = min(np.ptp(X), np.ptp(Y)) / 10 or 1.0
-    return background * (1 - 0.5 * np.exp(-(X ** 2 + Y ** 2) / (2 * width ** 2)))
 
 
 class DummyCamera(TriggerableCamera):
@@ -122,18 +105,12 @@ class DummyCamera(TriggerableCamera):
     def coordinate_grid(self):
         """The meshgrid every one of this camera's image functions is evaluated on.
 
-        Object-plane coordinates in micrometres: the sensor's pixels scaled by
-        `pixel_size` and `magnification` and centred on the sensor, so that a
-        function can model a cloud in physical units without restating the
-        imaging geometry. At the default 1 um pixels and 1x magnification the
-        grid is numerically the pixel indices.
+        Object-plane micrometres, from the `Width` and `Height` in this camera's
+        attributes and from the `pixel_size` and `magnification` it was given.
         """
-        width = int(self.camera_attributes.get('Width', DEFAULT_WIDTH))
-        height = int(self.camera_attributes.get('Height', DEFAULT_HEIGHT))
-        pixel_x, pixel_y = self.pixel_size
-        x = (np.arange(width) - (width - 1) / 2) * pixel_x / self.magnification
-        y = (np.arange(height) - (height - 1) / 2) * pixel_y / self.magnification
-        return np.meshgrid(x, y)
+        return sensor_grid(
+            self.camera_attributes, self.pixel_size, self.magnification
+        )
 
     def saturation(self):
         """The largest count a pixel of this camera can hold.

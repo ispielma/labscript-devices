@@ -25,7 +25,6 @@ IMAQdxCamera(
     'trigger',
     serial_number=0xDEADBEEF,
     worker=test_remote,
-    mock=True,
 )
 start()
 

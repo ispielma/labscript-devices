@@ -18,13 +18,8 @@ import sys
 import numpy as np
 
 from labscript_devices.TriggerableCamera.blacs_workers import (
-    MockCamera,
     TriggerableCameraWorker,
 )
-
-# MockCamera lives in TriggerableCamera. It is re-exported here as a compatibility
-# path for connection tables and device modules that import it from this module, and
-# can go once they import it from its own module.
 
 # Don't import nv yet so as not to throw an error, allow worker to run as a dummy
 # device, or for subclasses to import this module to inherit classes without requiring
