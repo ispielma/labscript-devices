@@ -36,6 +36,16 @@ def _unwritten(camera, method):
     return dedent(msg) % (type(camera).__name__, method)
 
 
+def _ignored_override(cls, method):
+    """The message for a worker override of a method that moved to the camera."""
+    msg = """%s overrides %s(), which is no longer called on the worker. That
+        method is now asked of the camera, so this override would be skipped
+        without a word, and the attributes saved into the shot file would not
+        be the ones this worker means to save. Move the override onto the
+        camera interface class named by interface_class."""
+    return dedent(msg) % (cls.__name__, method)
+
+
 class TriggerableCameraInterface(object):
     """The object a camera worker talks to in place of hardware.
 
@@ -206,7 +216,13 @@ class TriggerableCameraWorker(Worker):
     # otherwise they reimplement get_camera():
     interface_class = None
 
+    # Methods a worker used to define and the camera interface class defines
+    # now. No worker in the tree overrides one; a worker written against the
+    # old structure, outside the tree, may.
+    moved_to_camera = ['get_attributes_as_dict']
+
     def init(self):
+        self._check_for_ignored_overrides()
         self.camera = self.get_camera()
         print("Setting attributes...")
         self.smart_cache = {}
@@ -232,6 +248,24 @@ class TriggerableCameraWorker(Worker):
         self.h5_filepath = None
         self.stop_acquisition_timeout = None
         self.exception_on_failed_shot = None
+
+    def _check_for_ignored_overrides(self):
+        """Refuse to start if this worker overrides a method that moved away.
+
+        A worker outside this tree subclasses IMAQdxCameraWorker, which used to
+        define get_attributes_as_dict, and may override it to choose what goes
+        into the shot file. That method is now the camera's, and the callers
+        ask the camera, so such an override is no longer reached. Nothing would
+        fail: the shot file would just record a different set of attributes
+        than the lab asked for, which is the sort of wrong that looks right for
+        years. A traversal of the MRO at startup turns it into a message.
+        """
+        for cls in type(self).__mro__:
+            if cls is TriggerableCameraWorker:
+                return
+            for method in self.moved_to_camera:
+                if method in vars(cls):
+                    raise RuntimeError(_ignored_override(cls, method))
 
     def get_camera(self):
         """Return an instance of the camera interface class. Subclasses may override
