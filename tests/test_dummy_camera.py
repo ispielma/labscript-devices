@@ -30,6 +30,7 @@ from labscript_devices.DummyCamera.blacs_workers import (
     DummyCameraWorker,
 )
 import labscript_devices.TriggerableCamera.blacs_workers as camera_workers
+from labscript_devices.TriggerableCamera.blacs_workers import TriggerableCameraWorker
 
 from test_compile_device_tables import CompileTestCase
 
@@ -132,6 +133,52 @@ SATURATION_SHOT = PREAMBLE.replace("'Mono16'", "'Mono8'") + textwrap.dedent(
 )
 
 
+# A camera told to save none of its attributes to the shot file.
+NO_SAVED_ATTRIBUTES_SHOT = ABSORPTION_SHOT.replace(
+    "camera_attributes={'Width': 64, 'Height': 48, 'PixelFormat': 'Mono16'},",
+    "camera_attributes={'Width': 64, 'Height': 48, 'PixelFormat': 'Mono16'},\n"
+    "        saved_attribute_visibility_level=None,",
+)
+
+
+# A function whose arithmetic goes non-finite somewhere.
+NOT_FINITE_SHOT = PREAMBLE + textwrap.dedent(
+    '''
+    start()
+    camera.expose(
+        0.1, 'nan', function=lambda X, Y: np.full(X.shape, np.nan)
+    )
+    stop(1.0)
+    '''
+)
+
+
+# A camera whose attributes never say how big its images are.
+NO_SENSOR_SIZE_SHOT = PREAMBLE.replace(
+    "camera_attributes={'Width': 64, 'Height': 48, 'PixelFormat': 'Mono16'},",
+    "camera_attributes={'PixelFormat': 'Mono16'},",
+) + textwrap.dedent(
+    '''
+    start()
+    camera.expose(0.1, 'an exposure')
+    stop(1.0)
+    '''
+)
+
+
+# A function handed to expose() positionally, where trigger_duration goes.
+MISPLACED_FUNCTION_SHOT = PREAMBLE + textwrap.dedent(
+    '''
+    def an_image(X, Y):
+        return np.zeros(X.shape)
+
+    start()
+    camera.expose(0.1, 'oops', 'atoms', an_image)
+    stop(1.0)
+    '''
+)
+
+
 # A function that does not return an image the size of the sensor.
 WRONG_SHAPE_SHOT = PREAMBLE + textwrap.dedent(
     '''
@@ -165,6 +212,28 @@ class DummyCameraTestCase(CompileTestCase):
         self.compile_the_shot()
         with h5py.File(self.run_file, 'r') as f:
             return f['devices/camera/IMAGES'][:]
+
+    def run_the_shot(self, **shot_globals):
+        """Compile the shot and have a worker acquire and save its images.
+
+        Returns the images the compile produced, so that what the shot file
+        ends up holding can be compared against them.
+        """
+        compiled = self.compile_with_globals(**shot_globals)
+        worker = DummyCameraWorker.__new__(DummyCameraWorker)
+        # What BLACS passes a camera worker when it starts it:
+        worker.device_name = 'camera'
+        worker.serial_number = 0x0
+        worker.orientation = None
+        worker.camera_attributes = {'Width': 64, 'Height': 48}
+        worker.manual_mode_camera_attributes = {}
+        worker.parent_host = 'localhost'
+        worker.image_receiver_port = 0
+        with mock.patch.object(camera_workers, 'Context', AZMQContext):
+            worker.init()
+        worker.transition_to_buffered('camera', self.run_file, {}, True)
+        worker.transition_to_manual()
+        return compiled
 
 
 class AbsorptionImageTests(DummyCameraTestCase):
@@ -229,13 +298,58 @@ class CoordinateGridTests(DummyCameraTestCase):
 class DefaultImageTests(DummyCameraTestCase):
     shot = DEFAULT_IMAGE_SHOT
 
-    def test_an_exposure_with_no_function_still_gets_an_image(self):
+    def test_an_exposure_with_no_function_gets_a_blank_frame(self):
         images = self.compile_with_globals()
 
+        # A real image, of nothing: the camera models nothing on its own
+        # account, so with no function to ask there is nothing in the frame.
         self.assertEqual(images.shape, (1, 48, 64))
-        # The default image is a dip in a flat background.
-        image = images[0]
-        self.assertLess(image[24, 32], image[0, 0])
+        self.assertEqual(images.dtype, np.dtype('uint16'))
+        self.assertEqual(images[0].max(), 0)
+
+
+class RejectedFunctionTests(DummyCameraTestCase):
+    """What the camera does with a function it cannot store the output of."""
+
+    shot = NOT_FINITE_SHOT
+
+    def test_a_function_returning_a_nan_says_so(self):
+        # np.clip passes a NaN through and the cast to counts is undefined, so
+        # without this the shot file gets a plausible-looking frame of zeros.
+        with self.assertRaises(ValueError) as raised:
+            self.compile_with_globals()
+
+        self.assertIn('finite', str(raised.exception))
+        self.assertIn('nan', str(raised.exception))
+
+
+class MisplacedFunctionTests(DummyCameraTestCase):
+    shot = MISPLACED_FUNCTION_SHOT
+
+    def test_a_function_where_the_trigger_duration_goes_says_so(self):
+        # Without this it is a TypeError from comparing a function to a number,
+        # naming neither expose() nor the function.
+        with self.assertRaises(ValueError) as raised:
+            self.compile_with_globals()
+
+        message = str(raised.exception)
+        self.assertIn('an_image', message)
+        self.assertIn('function=', message)
+
+
+class SensorSizeTests(DummyCameraTestCase):
+    shot = NO_SENSOR_SIZE_SHOT
+
+    def test_a_camera_never_told_its_size_says_so_before_it_compiles(self):
+        # Raised from the constructor, not from generate_code: a failure there
+        # leaves the shot file half written and unable to be compiled again.
+        with self.assertRaises(ValueError) as raised:
+            self.compile_with_globals()
+
+        self.assertIn('Width', str(raised.exception))
+        self.assertIn('Height', str(raised.exception))
+        with h5py.File(self.run_file, 'r') as f:
+            self.assertNotIn('devices', f)
 
 
 class AnImageSocket:
@@ -280,28 +394,6 @@ class SavedImageTests(DummyCameraTestCase):
 
     shot = ABSORPTION_SHOT
 
-    def run_the_shot(self, **shot_globals):
-        """Compile the shot and have a worker acquire and save its images.
-
-        Returns the images the compile produced, so that what the shot file
-        ends up holding can be compared against them.
-        """
-        compiled = self.compile_with_globals(**shot_globals)
-        worker = DummyCameraWorker.__new__(DummyCameraWorker)
-        # What BLACS passes a camera worker when it starts it:
-        worker.device_name = 'camera'
-        worker.serial_number = 0x0
-        worker.orientation = None
-        worker.camera_attributes = {'Width': 64, 'Height': 48}
-        worker.manual_mode_camera_attributes = {}
-        worker.parent_host = 'localhost'
-        worker.image_receiver_port = 0
-        with mock.patch.object(camera_workers, 'Context', AZMQContext):
-            worker.init()
-        worker.transition_to_buffered('camera', self.run_file, {}, True)
-        worker.transition_to_manual()
-        return compiled
-
     def test_the_images_are_saved_where_a_real_camera_saves_them(self):
         self.run_the_shot(optical_density=2.0)
 
@@ -332,8 +424,6 @@ class SavedImageTests(DummyCameraTestCase):
         with h5py.File(self.run_file, 'r') as f:
             attrs = dict(f['images/camera'].attrs)
 
-        # The camera's attributes reach the shot file by the path every
-        # camera's do, so the marker arrives with them.
         self.assertTrue(attrs['NOT_REAL_DATA'])
 
     def test_the_datasets_declare_themselves_to_be_images(self):
@@ -385,6 +475,24 @@ class WrongShapeTests(DummyCameraTestCase):
         self.assertIn('wrong', message)
 
 
+class UnsavedAttributeTests(DummyCameraTestCase):
+    shot = NO_SAVED_ATTRIBUTES_SHOT
+
+    def test_the_marker_survives_a_camera_that_saves_no_attributes(self):
+        # saved_attribute_visibility_level says how much camera metadata to
+        # keep, and this camera keeps none of it. The one thing saying these
+        # images were made up is not metadata anyone may decide not to keep, so
+        # it does not travel that way.
+        self.run_the_shot(optical_density=2.0)
+
+        with h5py.File(self.run_file, 'r') as f:
+            attrs = dict(f['images/camera'].attrs)
+
+        self.assertTrue(attrs['NOT_REAL_DATA'])
+        # The rest of them really are switched off.
+        self.assertNotIn('Width', attrs)
+
+
 class PlaybackTests(unittest.TestCase):
     """What the worker's camera does with the images the shot compiled."""
 
@@ -411,20 +519,47 @@ class PlaybackTests(unittest.TestCase):
 
         np.testing.assert_array_equal(self.camera.grab(), self.frames[0])
 
-    def test_more_triggers_than_exposures_is_an_error(self):
+    def test_more_triggers_than_exposures_during_a_shot_is_an_error(self):
+        # Still inside the shot: the frames are loaded and every one has been
+        # handed out, so another trigger has arrived than the shot accounts for.
         self.camera.load_images(self.frames)
         self.camera.grab_multiple(3, [])
 
         with self.assertRaises(ValueError):
             self.camera.grab()
 
-    def test_with_no_shot_loaded_it_returns_the_default_image(self):
+    def test_manual_mode_after_a_shot_does_not_grab_the_shot_again(self):
+        # BLACS resumes continuous acquisition after a shot by configuring a
+        # continuous acquisition. Without this the first grab of the resumed
+        # loop raises, or -- on a shot that ended early -- hands back the
+        # leftover frames of the finished shot as though they were live.
+        self.camera.load_images(self.frames)
+        self.camera.grab_multiple(3, [])
+
+        self.camera.configure_acquisition(continuous=True)
+
+        image = self.camera.grab()
+        self.assertEqual(image.shape, (4, 5))
+        self.assertEqual(image.max(), 0)
+
+    def test_aborting_stops_the_acquisition(self):
+        self.camera.load_images(self.frames)
+        self.camera.abort_acquisition()
+
+        images = []
+        self.camera.grab_multiple(3, images)
+
+        self.assertEqual(images, [])
+
+    def test_with_no_shot_loaded_it_returns_a_blank_frame(self):
         # Manual mode: pressing Snap in the tab, with no shot and so no image
-        # function. It is still this camera's sensor that answers.
+        # function. It is still this camera's sensor that answers, and what it
+        # answers with is a real image of nothing.
         image = self.camera.grab()
 
         self.assertEqual(image.shape, (4, 5))
         self.assertEqual(image.dtype, np.dtype('uint16'))
+        self.assertEqual(image.max(), 0)
 
     def test_a_camera_never_told_its_size_says_so(self):
         camera = Dummy_Camera(0x0)
@@ -441,6 +576,22 @@ class PlaybackTests(unittest.TestCase):
         # take, rather than pixels drawn onto the data.
         self.assertIs(self.camera.get_attribute('NOT_REAL_DATA'), True)
         self.assertIn('NOT_REAL_DATA', self.camera.get_attribute_names())
+
+
+class InterfaceClassTests(unittest.TestCase):
+    """A camera worker that names no interface class."""
+
+    def test_a_worker_with_no_interface_class_says_which_one(self):
+        # Every vendor worker is now a two-line subclass, so forgetting the one
+        # line that matters is easy; without this it is a bare TypeError about
+        # NoneType from inside a worker process.
+        worker = TriggerableCameraWorker.__new__(TriggerableCameraWorker)
+
+        with self.assertRaises(NotImplementedError) as raised:
+            worker.get_camera()
+
+        self.assertIn('TriggerableCameraWorker', str(raised.exception))
+        self.assertIn('interface_class', str(raised.exception))
 
 
 if __name__ == '__main__':

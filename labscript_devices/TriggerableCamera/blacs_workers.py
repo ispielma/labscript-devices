@@ -61,7 +61,22 @@ class TriggerableCameraWorker(Worker):
         """Return an instance of the camera interface class. Subclasses may override
         this method to pass required arguments to their class if they require more
         than just the serial number."""
+        if self.interface_class is None:
+            msg = """%s names no interface class. A camera worker sets
+                interface_class to the class that talks to its camera, or
+                reimplements get_camera()."""
+            raise NotImplementedError(dedent(msg) % type(self).__name__)
         return self.interface_class(self.serial_number)
+
+    def load_shot_data(self, shot_file):
+        """Read whatever else this worker needs from the shot file.
+
+        Called from transition_to_buffered with the shot file open, once the
+        exposures and the camera attributes have been read from it. A camera
+        that needs more of the shot than those overrides this, rather than
+        opening and locking the file a second time.
+        """
+        pass
 
     def set_attributes_smart(self, attributes):
         """Call self.camera.set_attributes() to set the given attributes, only setting
@@ -170,6 +185,7 @@ class TriggerableCameraWorker(Worker):
             self.exception_on_failed_shot = properties['exception_on_failed_shot']
             saved_attr_level = properties['saved_attribute_visibility_level']
             self.camera.exception_on_failed_shot = self.exception_on_failed_shot
+            self.load_shot_data(f)
         # Only reprogram attributes that differ from those last programmed in, or all of
         # them if a fresh reprogramming was requested:
         if fresh:
