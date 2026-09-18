@@ -76,10 +76,8 @@ class TriggerableCamera(TriggerableDevice):
                 Name of digital output port on parent device.
 
             serial_number (str or int)
-                The camera's serial number, in whatever form its API expects.
-                This will be used to identify the camera. A subclass whose API
-                spells serial numbers differently converts it before passing it
-                here, as :obj:`IMAQdxCamera` does for hexadecimal.
+                string or integer (integer allows entering a hex literal) of the
+                camera's serial number. This will be used to idenitfy the camera.
 
             orientation (str, optional), default: `<name>`
                 Description of the camera's location or orientation. This will be used
@@ -161,8 +159,10 @@ class TriggerableCamera(TriggerableDevice):
         self.orientation = orientation
         self.pixel_size = pixel_size
         self.magnification = magnification
+        if isinstance(serial_number, (str, bytes)):
+            serial_number = int(serial_number, 16)
         self.serial_number = serial_number
-        self.BLACS_connection = str(serial_number)
+        self.BLACS_connection = hex(self.serial_number)[2:].upper()
         if camera_attributes is None:
             camera_attributes = {}
         if manual_mode_camera_attributes is None:
