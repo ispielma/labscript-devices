@@ -19,7 +19,6 @@ from labscript_devices.TriggerableCamera.blacs_workers import (
 class AndorCamera(TriggerableCameraInterface):
 
     def __init__(self):
-        TriggerableCameraInterface.__init__(self)
         global AndorCam
         from .andor_sdk.andor_utils import AndorCam
         self.camera = AndorCam()
@@ -54,7 +53,7 @@ class AndorCamera(TriggerableCameraInterface):
         # Consider using run til abort acquisition mode...
         return img
 
-    def grab_multiple(self, n_images, images, waitForNextBuffer=True):
+    def grab_multiple(self, n_images, images):
         """Grab n_images into images array during buffered acquistion."""
     
         # TODO: Catch timeout errors, check if abort, else keep trying.

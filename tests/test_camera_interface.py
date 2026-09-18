@@ -13,71 +13,109 @@ skips a frame when the shot says not to fail; Pylon and FlyCapture2 retry
 forever on their own error classes; Spinnaker and the dummy camera do not retry
 at all.
 """
-import sys
 import unittest
-
-import numpy as np
 
 from labscript_devices.TriggerableCamera.blacs_workers import (
     TriggerableCameraInterface,
+    TriggerableCameraWorker,
 )
-from labscript_devices.IMAQdxCamera.blacs_workers import IMAQdx_Camera
-from labscript_devices.PylonCamera.blacs_workers import Pylon_Camera
-from labscript_devices.SpinnakerCamera.blacs_workers import Spinnaker_Camera
-from labscript_devices.FlyCapture2Camera.blacs_workers import FlyCapture2_Camera
-from labscript_devices.AndorSolis.blacs_workers import AndorCamera
-from labscript_devices.DummyCamera.blacs_workers import Dummy_Camera
+from labscript_devices.IMAQdxCamera.blacs_workers import (
+    IMAQdx_Camera,
+    IMAQdxCameraWorker,
+)
+from labscript_devices.PylonCamera.blacs_workers import (
+    Pylon_Camera,
+    PylonCameraWorker,
+)
+from labscript_devices.SpinnakerCamera.blacs_workers import (
+    Spinnaker_Camera,
+    SpinnakerCameraWorker,
+)
+from labscript_devices.FlyCapture2Camera.blacs_workers import (
+    FlyCapture2_Camera,
+    FlyCapture2CameraWorker,
+)
+from labscript_devices.AndorSolis.blacs_workers import AndorCamera, AndorSolisWorker
+from labscript_devices.DummyCamera.blacs_workers import Dummy_Camera, DummyCameraWorker
 
 
-# What TriggerableCameraWorker calls on self.camera, whatever camera it is.
-REQUIRED_METHODS = [
+# What TriggerableCameraWorker calls on self.camera that no base can supply,
+# because there is nothing generic to say: it is all one vendor's API.
+VENDOR_MUST_WRITE = [
     'set_attributes',
+    'get_attribute',
     'snap',
     'grab',
-    'grab_multiple',
     'configure_acquisition',
     'stop_acquisition',
-    'abort_acquisition',
     'close',
 ]
 
-# What it assigns to. Both are read back by the acquisition loop.
+# What the worker calls that TriggerableCameraInterface supplies, and a camera
+# overrides only when its hardware needs something else.
+BASE_MAY_SUPPLY = ['grab_multiple', 'abort_acquisition']
+
+# What the worker assigns to. Both are read back by the acquisition loop.
 REQUIRED_ATTRIBUTES = ['exception_on_failed_shot', '_abort_acquisition']
 
-# The worker composes the attributes it saves from these, unless the camera's
-# worker overrides get_attributes_as_dict. Pylon, FlyCapture2 and AndorSolis do.
-COMPOSE_ATTRIBUTES_FROM = ['get_attribute_names', 'get_attribute']
-
+# Every camera in the tree, with the worker that drives it.
 EVERY_CAMERA = [
-    IMAQdx_Camera,
-    Pylon_Camera,
-    Spinnaker_Camera,
-    FlyCapture2_Camera,
-    AndorCamera,
-    Dummy_Camera,
+    (IMAQdx_Camera, IMAQdxCameraWorker),
+    (Pylon_Camera, PylonCameraWorker),
+    (Spinnaker_Camera, SpinnakerCameraWorker),
+    (FlyCapture2_Camera, FlyCapture2CameraWorker),
+    (AndorCamera, AndorSolisWorker),
+    (Dummy_Camera, DummyCameraWorker),
 ]
 
-CAMERAS_THE_WORKER_COMPOSES_ATTRIBUTES_FOR = [
-    IMAQdx_Camera,
-    Spinnaker_Camera,
-    Dummy_Camera,
-]
+
+def written_by_the_camera(camera, name):
+    """Whether this camera writes `name` itself.
+
+    Resolving the name is not enough once every camera inherits
+    TriggerableCameraInterface: it supplies a stub for each member of the
+    contract, so getattr succeeds whether or not the camera implements it and
+    the failure moves to the middle of a shot. What this asks is whether the
+    camera brought its own.
+    """
+    return getattr(camera, name, None) is not getattr(TriggerableCameraInterface, name, None)
+
+
+def worker_composes_attributes_by_name(worker):
+    """Whether this worker builds its attribute dict from the camera's names.
+
+    A worker that does needs get_attribute_names and get_attribute on its
+    camera; one that overrides get_attributes_as_dict asks the camera for the
+    whole dict instead and needs neither. Asked of the worker rather than
+    listed here, so the two cannot drift apart.
+    """
+    return (
+        worker.get_attributes_as_dict
+        is TriggerableCameraWorker.get_attributes_as_dict
+    )
 
 
 class ContractTests(unittest.TestCase):
-    def test_every_camera_has_what_the_worker_calls(self):
-        for camera in EVERY_CAMERA:
-            for name in REQUIRED_METHODS:
+    def test_every_camera_writes_the_members_only_it_can(self):
+        for camera, _ in EVERY_CAMERA:
+            for name in VENDOR_MUST_WRITE:
                 with self.subTest(camera=camera.__name__, member=name):
                     self.assertTrue(
-                        callable(getattr(camera, name, None)),
-                        f'{camera.__name__} has no {name}()',
+                        written_by_the_camera(camera, name),
+                        f'{camera.__name__} does not implement {name}(); it '
+                        f'would inherit the stub, which raises mid-shot',
                     )
+
+    def test_every_camera_has_the_members_the_base_can_supply(self):
+        for camera, _ in EVERY_CAMERA:
+            for name in BASE_MAY_SUPPLY:
+                with self.subTest(camera=camera.__name__, member=name):
+                    self.assertTrue(callable(getattr(camera, name, None)))
 
     def test_every_camera_has_what_the_worker_assigns_to(self):
         # These are read back by the acquisition loop, so a camera that never
         # declares them works only because assignment creates them.
-        for camera in EVERY_CAMERA:
+        for camera, _ in EVERY_CAMERA:
             for name in REQUIRED_ATTRIBUTES:
                 with self.subTest(camera=camera.__name__, member=name):
                     self.assertTrue(
@@ -86,10 +124,15 @@ class ContractTests(unittest.TestCase):
                     )
 
     def test_cameras_the_worker_asks_for_attributes_by_name_can_answer(self):
-        for camera in CAMERAS_THE_WORKER_COMPOSES_ATTRIBUTES_FOR:
-            for name in COMPOSE_ATTRIBUTES_FROM:
-                with self.subTest(camera=camera.__name__, member=name):
-                    self.assertTrue(callable(getattr(camera, name, None)))
+        for camera, worker in EVERY_CAMERA:
+            if not worker_composes_attributes_by_name(worker):
+                continue
+            with self.subTest(camera=camera.__name__):
+                self.assertTrue(
+                    written_by_the_camera(camera, 'get_attribute_names'),
+                    f'{worker.__name__} builds its attribute dict from the '
+                    f'camera\'s names, but {camera.__name__} does not list them',
+                )
 
     def test_an_unwritten_member_names_the_camera_and_the_member(self):
         class ACameraMissingSnap(TriggerableCameraInterface):

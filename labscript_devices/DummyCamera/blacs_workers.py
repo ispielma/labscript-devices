@@ -38,7 +38,6 @@ class Dummy_Camera(TriggerableCameraInterface):
     identifying_attributes = {'NOT_REAL_DATA': True}
 
     def __init__(self, serial_number=None):
-        TriggerableCameraInterface.__init__(self, serial_number)
         print("Starting device worker as a dummy camera")
         self.attributes = dict(self.identifying_attributes)
         self.images = None

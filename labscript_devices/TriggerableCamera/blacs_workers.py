@@ -71,9 +71,6 @@ class TriggerableCameraInterface(object):
     # acquisition thread.
     _abort_acquisition = False
 
-    def __init__(self, serial_number=None):
-        self.serial_number = serial_number
-
     # The members every camera writes for itself. Each raises rather than
     # doing nothing, because a camera that silently fails to program an
     # attribute or stop an acquisition is worse than one that does not start.
@@ -127,6 +124,11 @@ class TriggerableCameraInterface(object):
         else is a real failure. A camera whose `grab` blocks until a frame
         arrives, or which cannot tell a wait from a failure, says False to
         everything and is never retried.
+
+        The retry is paced by `grab` and by nothing else: a camera that says
+        True here must block for its own timeout before reporting the wait,
+        because the loop asks again immediately. One that returns straight
+        away would spin a core until the shot times out.
         """
         return False
 
@@ -153,7 +155,9 @@ class TriggerableCameraInterface(object):
     def grab_multiple(self, n_images, images):
         """Grab `n_images` frames, appending each to `images` as it arrives.
 
-        The worker runs this in a thread for the duration of a shot. A camera
+        The worker runs this in a thread for the duration of a shot, having
+        configured the acquisition for the same `n_images`, so a camera that
+        allocates its buffers up front has one per frame asked for. A camera
         whose acquisition is not one frame per `grab` -- a kinetic series, say
         -- overrides this wholesale rather than bending the loop around it.
         """
