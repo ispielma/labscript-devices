@@ -1,14 +1,16 @@
 """An absorption image with no hardware behind it.
 
-Compile this from runmanager with globals named `atom_number` and
-`cloud_radius`. The image function below uses them, so the images in the shot
-file change when they do. BLACS then acquires those images the way it acquires
+Make `atom_number` and `cloud_radius` globals in runmanager and the images in
+the shot file follow them; the values below apply only until you do, so this
+compiles as it stands. BLACS then acquires those images the way it acquires
 any camera's, and a lyse script reads them out of images/side/absorption the way
 it reads any camera's.
 
 The physics is all in `absorption_frame`, which is the point: the camera knows
 only how to call a function on its own pixels and store what comes back.
 """
+import builtins
+
 import numpy as np
 
 from labscript import *
@@ -19,6 +21,12 @@ from labscript_devices.DummyCamera.labscript_devices import DummyCamera
 
 # labscript_init('test.h5', new=True, overwrite=True)
 
+# The cloud these images show. runmanager puts a shot's globals in builtins, so
+# a global of the same name is already in scope here and wins: these values
+# apply only when there is no such global.
+atom_number = getattr(builtins, 'atom_number', 2.0e5)
+cloud_radius = getattr(builtins, 'cloud_radius', 60.0)  # 1/e radius, microns
+
 # The resonant absorption cross section of Rb-87 on the D2 line, in um^2.
 CROSS_SECTION = 0.2907
 
@@ -28,8 +36,8 @@ def absorption_frame(X, Y, atoms):
 
     X and Y are the camera's pixels in the object plane, in micrometres, so the
     cloud below is described in microns and not in pixels. `atom_number` and
-    `cloud_radius` are globals of the shot: nothing passes them in, they are
-    simply in scope by the time this is called.
+    `cloud_radius` are read above: nothing passes them in, and a runmanager
+    global of either name is what they hold when there is one.
 
     All three frames come from this one function, which is what makes them
     agree with each other -- the probe beam is identical in the atoms and probe

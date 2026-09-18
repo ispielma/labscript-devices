@@ -16,7 +16,12 @@ import re
 import numpy as np
 from labscript_utils import dedent
 
-from labscript_devices.DummyCamera.sensor import default_image, sensor_grid
+from labscript_devices.DummyCamera.sensor import (
+    as_counts,
+    blank_image,
+    sensor_grid,
+    sensor_size,
+)
 from labscript_devices.TriggerableCamera.labscript_devices import TriggerableCamera
 
 
@@ -64,6 +69,11 @@ class DummyCamera(TriggerableCamera):
         TriggerableCamera.__init__(
             self, name, parent_device, connection, serial_number, **kwargs
         )
+        # Checked here rather than where it is first needed, which is
+        # generate_code: a failure there aborts the compile with the shot file
+        # already half written, and the half-written file cannot be compiled a
+        # second time either.
+        sensor_size(self.camera_attributes)
 
     def expose(
         self,
@@ -71,8 +81,8 @@ class DummyCamera(TriggerableCamera):
         name,
         frametype='frame',
         trigger_duration=None,
-        function=None,
         *args,
+        function=None,
         **kwargs
     ):
         """Request an exposure, and name the function that produces its image.
@@ -94,8 +104,15 @@ class DummyCamera(TriggerableCamera):
         method sharing one function with different arguments. Sharing the
         function is what makes the frames consistent.
 
-        If no function is given the exposure gets :obj:`default_image`.
+        The function is passed by keyword. An exposure given none gets a
+        blank frame.
         """
+        if callable(trigger_duration):
+            msg = """%s was passed where this exposure's trigger duration goes.
+                A dummy camera takes its image function by keyword:
+                camera.expose(t, name, frametype, function=%s)."""
+            name_of = getattr(trigger_duration, '__name__', trigger_duration)
+            raise ValueError(dedent(msg) % (name_of, name_of))
         trigger_duration = TriggerableCamera.expose(
             self, t, name, frametype, trigger_duration
         )
@@ -132,38 +149,49 @@ class DummyCamera(TriggerableCamera):
         if not self.exposures:
             return
         group = hdf5_file['devices'][self.name]
+        width, height = sensor_size(self.camera_attributes)
         X, Y = self.coordinate_grid()
         saturation = self.saturation()
         images = []
         # A camera's frames arrive in the order its triggers do, and
         # transition_to_manual matches them up with the exposures sorted by time.
         # Sorting the images the same way is what puts each one under the name
-        # and frametype of the exposure that asked for it.
-        times = [exposure[0] for exposure in self.exposures]
-        for i in np.argsort(times, kind='stable'):
+        # and frametype of the exposure that asked for it. Sorting whole
+        # exposures rather than their times alone is what makes this the same
+        # order: numpy's sort(order='t') breaks ties on the remaining fields, in
+        # dtype order, which is what comparing the tuples does.
+        for i in sorted(range(len(self.exposures)), key=self.exposures.__getitem__):
             function, args, kwargs = self.image_functions[i]
             if function is None:
-                function = default_image
+                images.append(blank_image(width, height))
+                continue
             image = np.asarray(function(X, Y, *args, **kwargs))
+            complaint = None
             if image.shape != X.shape:
+                complaint = """returned an array of shape %s, but this camera's
+                    images are %s. An image function is evaluated on the
+                    camera's coordinate grid and must return an array of the
+                    same shape as it.""" % (image.shape, X.shape)
+            elif not np.isfinite(image).all():
+                # np.clip passes a NaN through and the cast to counts is then
+                # undefined, so an image that is quietly saturated or quietly
+                # black would be stored as though a sensor had read it.
+                complaint = """returned an array holding values that are not
+                    finite, which cannot be stored as camera counts. Somewhere
+                    in it there is a NaN or an infinity."""
+            if complaint is not None:
                 t, name, frametype, _ = self.exposures[i]
-                msg = """%s returned an array of shape %s for the '%s' exposure
-                    '%s' of %s at t = %s, but this camera's images are %s. An
-                    image function is evaluated on the camera's coordinate grid
-                    and must return an array of the same shape as it."""
+                msg = "%s %s (the '%s' exposure '%s' of %s at t = %s)"
                 raise ValueError(
-                    dedent(msg)
+                    msg
                     % (
                         getattr(function, '__name__', function),
-                        image.shape,
+                        dedent(complaint),
                         frametype,
                         name,
                         self.name,
                         t,
-                        X.shape,
                     )
                 )
-            images.append(np.clip(image, 0, saturation))
-        group.create_dataset(
-            'IMAGES', data=np.array(images, dtype='uint16'), compression='gzip'
-        )
+            images.append(as_counts(image, saturation))
+        group.create_dataset('IMAGES', data=np.array(images), compression='gzip')

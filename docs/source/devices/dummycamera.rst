@@ -28,9 +28,10 @@ worse than one that does not compile.
 Usage
 ~~~~~
 
-An image function takes the camera's coordinate grid, then whatever else you
-choose to pass it, and returns an array of counts of the same shape as the
-grid. :code:`X` and :code:`Y` are in object-plane micrometres, scaled by the
+An image function is passed to :code:`expose` by keyword. It takes the camera's
+coordinate grid, then whatever else you choose to pass it, and returns an array
+of counts of the same shape as the grid, which the camera clips to what one of
+its pixels holds and stores as :code:`uint16`, the way a real camera reads out. :code:`X` and :code:`Y` are in object-plane micrometres, scaled by the
 camera's :code:`pixel_size` and :code:`magnification`, so a function describes a
 cloud in microns rather than in pixels.
 
@@ -80,12 +81,13 @@ stored anywhere -- only the images it returns are. So it can be any callable,
 including a local function or a lambda, and the machine BLACS runs on does not
 need it, even when the camera's worker is on another host.
 
-An exposure given no function gets :obj:`~labscript_devices.DummyCamera.sensor.default_image`,
-a plain dip in a flat background, so that a connection table with a dummy camera
-in it compiles and runs before any model has been written. It is also what the
-Snap button in the BLACS tab shows, where there is no shot and so no function.
+An exposure given no function gets :obj:`~labscript_devices.DummyCamera.sensor.blank_image`:
+a real frame, of nothing, at the size the sensor is configured for. That is also
+what the Snap button in the BLACS tab shows, where there is no shot and so no
+function at all. The camera invents nothing on its own account -- anything in a
+frame got there because a function you wrote put it there.
 
-Noise is the function's business: the camera adds none. What the camera does add
+Noise is the function's business too: the camera adds none. What the camera does add
 is a :code:`NOT_REAL_DATA` attribute beside the images in the shot file, which is
 what marks them as simulated. It is an attribute rather than a watermark drawn
 onto the pixels because a watermark does not cancel in

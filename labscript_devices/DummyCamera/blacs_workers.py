@@ -12,12 +12,8 @@
 #####################################################################
 
 from labscript_utils import dedent
-import labscript_utils.h5_lock
-import h5py
 
-from labscript_utils.shared_drive import path_to_local
-
-from labscript_devices.DummyCamera.sensor import default_image, sensor_grid
+from labscript_devices.DummyCamera.sensor import blank_image, sensor_size
 from labscript_devices.TriggerableCamera.blacs_workers import (
     TriggerableCameraWorker,
 )
@@ -57,8 +53,13 @@ class Dummy_Camera(object):
     def get_attribute_names(self, visibility_level=None):
         return list(self.attributes.keys())
 
-    def configure_acquisition(self, continuous=False, bufferCount=5):
-        pass
+    def configure_acquisition(self, continuous=True, bufferCount=5):
+        # A continuous acquisition is manual mode, where there is no shot and
+        # so no compiled frames. Whatever the last shot left behind is not
+        # live data, and handing it back would show it as though it were.
+        if continuous:
+            self.images = None
+        self.index = 0
 
     def load_images(self, images):
         """Take the frames this shot compiled, to be returned one per grab."""
@@ -68,11 +69,12 @@ class Dummy_Camera(object):
     def snap(self):
         """A frame with no shot behind it, for manual mode.
 
-        There is no shot, so there is no image function and no imaging geometry
-        either: this is the default image on the camera's own pixels.
+        There is no shot and so no image function, and a camera that invented
+        something to show here would be modelling data on its own account.
+        So this is a blank frame at the size the sensor is configured for:
+        a real image, of nothing.
         """
-        image = default_image(*sensor_grid(self.attributes))
-        return image.astype('uint16')
+        return blank_image(*sensor_size(self.attributes))
 
     def grab(self):
         if self.images is None:
@@ -89,6 +91,10 @@ class Dummy_Camera(object):
     def grab_multiple(self, n_images, images, waitForNextBuffer=True):
         print(f"Attempting to grab {n_images} images.")
         for i in range(n_images):
+            if self._abort_acquisition:
+                print("Abort during acquisition.")
+                self._abort_acquisition = False
+                return
             images.append(self.grab())
             print(f"Got image {i+1} of {n_images}.")
         print(f"Got {len(images)} of {n_images} images.")
@@ -114,14 +120,22 @@ class DummyCameraWorker(TriggerableCameraWorker):
 
     interface_class = Dummy_Camera
 
-    def transition_to_buffered(self, device_name, h5_filepath, initial_values, fresh):
-        local_filepath = h5_filepath
-        if getattr(self, 'is_remote', False):
-            local_filepath = path_to_local(h5_filepath)
-        with h5py.File(local_filepath, 'r') as f:
-            group = f['devices'][self.device_name]
-            images = group['IMAGES'][:] if 'IMAGES' in group else None
+    def load_shot_data(self, shot_file):
+        """Hand the camera the frames this shot compiled."""
+        group = shot_file['devices'][self.device_name]
+        images = group['IMAGES'][:] if 'IMAGES' in group else None
         self.camera.load_images(images)
-        return TriggerableCameraWorker.transition_to_buffered(
+
+    def transition_to_buffered(self, device_name, h5_filepath, initial_values, fresh):
+        return_value = TriggerableCameraWorker.transition_to_buffered(
             self, device_name, h5_filepath, initial_values, fresh
         )
+        # NOT_REAL_DATA is not camera metadata anyone may decide not to save:
+        # it is the only thing in the shot file saying these images were made
+        # up, so it does not travel by saved_attribute_visibility_level, which
+        # switches the rest of them off. Merging it last also keeps a camera
+        # attribute of the same name from overriding it.
+        self.attributes_to_save = dict(
+            self.attributes_to_save or {}, **Dummy_Camera.identifying_attributes
+        )
+        return return_value

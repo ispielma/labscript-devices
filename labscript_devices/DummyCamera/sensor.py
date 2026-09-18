@@ -11,13 +11,17 @@
 #                                                                   #
 #####################################################################
 
-"""Where a dummy camera's pixels are, and what it shows when nothing says otherwise.
+"""A dummy camera's sensor: how big it is, and what its counts are stored as.
 
 Both halves of the device need these. The labscript half evaluates image
 functions on the grid while the shot compiles; the BLACS worker needs the same
-grid for a manual-mode frame, where there is no shot and so no image function.
+size for a manual-mode frame, where there is no shot and so no image function.
 Neither half can import the other's module -- one reaches labscript and through
 it pylab, the other reaches blacs -- so they share this one, which needs neither.
+
+Nothing here models anything. A camera returns counts; what those counts mean is
+the user's image function's business, and a blank frame is what this module
+offers when no function has said otherwise.
 """
 
 import numpy as np
@@ -25,14 +29,17 @@ import numpy as np
 from labscript_utils import dedent
 
 
-def sensor_grid(camera_attributes, pixel_size=(1.0, 1.0), magnification=1.0):
-    """The meshgrid a dummy camera's image functions are evaluated on.
+# What a camera's images are, everywhere: whole counts, as a sensor reads them.
+# The shot file stores them in uint16 datasets and the BLACS tab expects the
+# same, so an image function's floats become this before anything else sees them.
+IMAGE_DTYPE = np.uint16
 
-    Object-plane coordinates in micrometres: the sensor's pixels scaled by
-    `pixel_size` and `magnification` and centred on the sensor, so that a
-    function can model a cloud in physical units without restating the imaging
-    geometry. At the default 1 um pixels and 1x magnification the grid is
-    numerically the pixel indices.
+# The count a frame holds when nothing has said what it should hold.
+BLANK_COUNTS = 0
+
+
+def sensor_size(camera_attributes):
+    """The (width, height) in pixels that a dummy camera's attributes give it.
 
     `Width` and `Height` come from the camera's attributes, where a real
     camera's resolution comes from. A dummy camera has no sensor to fall back
@@ -46,23 +53,43 @@ def sensor_grid(camera_attributes, pixel_size=(1.0, 1.0), magnification=1.0):
             camera_attributes={'Width': ..., 'Height': ...}, the way a real
             camera is told its resolution."""
         raise ValueError(dedent(msg) % ' and '.join(missing))
-    width = int(camera_attributes['Width'])
-    height = int(camera_attributes['Height'])
+    return int(camera_attributes['Width']), int(camera_attributes['Height'])
+
+
+def sensor_grid(camera_attributes, pixel_size=(1.0, 1.0), magnification=1.0):
+    """The meshgrid a dummy camera's image functions are evaluated on.
+
+    Object-plane coordinates in micrometres: the sensor's pixels scaled by
+    `pixel_size` and `magnification` and centred on the sensor, so that a
+    function can model a cloud in physical units without restating the imaging
+    geometry. At the default 1 um pixels and 1x magnification the grid is
+    numerically the pixel indices.
+    """
+    width, height = sensor_size(camera_attributes)
     pixel_x, pixel_y = pixel_size
     x = (np.arange(width) - (width - 1) / 2) * pixel_x / magnification
     y = (np.arange(height) - (height - 1) / 2) * pixel_y / magnification
     return np.meshgrid(x, y)
 
 
-def default_image(X, Y):
-    """The image a dummy camera produces when no function was given for one.
+def blank_image(width, height):
+    """A valid frame with nothing in it.
 
-    A Gaussian dip in a flat background, so that a connection table with a dummy
-    camera in it compiles and runs before anyone has written a model, and so
-    that the Snap button in the BLACS tab shows something. It takes the
-    arguments every image function takes and returns counts, like any other:
-    nothing about it is special to the camera.
+    What a dummy camera produces when nothing has said what it should produce:
+    an exposure given no function, and the Snap button in the BLACS tab, where
+    there is no shot at all. It is deliberately the least interesting image that
+    is still a real one, because anything more would be this module modelling
+    data, which is the user's function's job and not the camera's.
     """
-    background = 500.0
-    width = min(np.ptp(X), np.ptp(Y)) / 10 or 1.0
-    return background * (1 - 0.5 * np.exp(-(X ** 2 + Y ** 2) / (2 * width ** 2)))
+    return np.full((height, width), BLANK_COUNTS, dtype=IMAGE_DTYPE)
+
+
+def as_counts(image, saturation):
+    """An image function's array as the camera stores it.
+
+    Clipped to what one of this camera's pixels holds, and in the integer type a
+    sensor reads out: a camera does not return floats, and a value past full
+    well saturates rather than wrapping around.
+    """
+    image = np.asarray(image, dtype=float)
+    return np.clip(image, 0, saturation).astype(IMAGE_DTYPE)
