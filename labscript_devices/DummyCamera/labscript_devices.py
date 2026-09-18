@@ -17,7 +17,7 @@ import numpy as np
 from labscript_utils import dedent
 
 from labscript_devices.DummyCamera.sensor import (
-    as_counts,
+    IMAGE_DTYPE,
     blank_image,
     sensor_grid,
     sensor_size,
@@ -144,6 +144,16 @@ class DummyCamera(TriggerableCamera):
         bit_depth = int(match.group(1)) if match else DEFAULT_BIT_DEPTH
         return 2 ** min(bit_depth, DEFAULT_BIT_DEPTH) - 1
 
+    def as_counts(self, image):
+        """An image function's array as this camera stores it.
+
+        Clipped to what one of its pixels holds, and in the integer type a
+        sensor reads out: a camera does not return floats, and a value past
+        full well saturates rather than wrapping around.
+        """
+        image = np.asarray(image, dtype=float)
+        return np.clip(image, 0, self.saturation()).astype(IMAGE_DTYPE)
+
     def generate_code(self, hdf5_file):
         TriggerableCamera.generate_code(self, hdf5_file)
         if not self.exposures:
@@ -151,7 +161,6 @@ class DummyCamera(TriggerableCamera):
         group = hdf5_file['devices'][self.name]
         width, height = sensor_size(self.camera_attributes)
         X, Y = self.coordinate_grid()
-        saturation = self.saturation()
         images = []
         # A camera's frames arrive in the order its triggers do, and
         # transition_to_manual matches them up with the exposures sorted by time.
@@ -193,5 +202,5 @@ class DummyCamera(TriggerableCamera):
                         t,
                     )
                 )
-            images.append(as_counts(image, saturation))
+            images.append(self.as_counts(image))
         group.create_dataset('IMAGES', data=np.array(images), compression='gzip')

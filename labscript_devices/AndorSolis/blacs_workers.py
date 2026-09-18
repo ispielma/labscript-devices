@@ -122,8 +122,3 @@ class AndorSolisWorker(TriggerableCameraWorker):
         """ Andor cameras may not be specified by serial numbers"""
         return self.interface_class()
             
-    def get_attributes_as_dict(self, visibility_level):
-        """Return a dict of the attributes of the camera for the given visibility
-        level"""
-        return self.camera.attributes
-

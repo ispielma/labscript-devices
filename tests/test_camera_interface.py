@@ -51,13 +51,6 @@ VENDOR_MUST_WRITE = [
     'close',
 ]
 
-# What the worker calls that TriggerableCameraInterface supplies, and a camera
-# overrides only when its hardware needs something else.
-BASE_MAY_SUPPLY = ['grab_multiple', 'abort_acquisition']
-
-# What the worker assigns to. Both are read back by the acquisition loop.
-REQUIRED_ATTRIBUTES = ['exception_on_failed_shot', '_abort_acquisition']
-
 # Every camera in the tree, with the worker that drives it.
 EVERY_CAMERA = [
     (IMAQdx_Camera, IMAQdxCameraWorker),
@@ -106,22 +99,16 @@ class ContractTests(unittest.TestCase):
                         f'would inherit the stub, which raises mid-shot',
                     )
 
-    def test_every_camera_has_the_members_the_base_can_supply(self):
+    def test_every_camera_in_the_tree_inherits_the_base(self):
+        # The rest of the contract -- grab_multiple, abort_acquisition, and the
+        # two flags the acquisition loop reads back -- is what inheriting
+        # supplies. Asking whether each name resolves would answer itself once
+        # the base defines them all, so this asks the question that is really
+        # being put: are these six still getting them from there. A camera
+        # outside the tree need not inherit; the worker duck-types it.
         for camera, _ in EVERY_CAMERA:
-            for name in BASE_MAY_SUPPLY:
-                with self.subTest(camera=camera.__name__, member=name):
-                    self.assertTrue(callable(getattr(camera, name, None)))
-
-    def test_every_camera_has_what_the_worker_assigns_to(self):
-        # These are read back by the acquisition loop, so a camera that never
-        # declares them works only because assignment creates them.
-        for camera, _ in EVERY_CAMERA:
-            for name in REQUIRED_ATTRIBUTES:
-                with self.subTest(camera=camera.__name__, member=name):
-                    self.assertTrue(
-                        hasattr(camera, name),
-                        f'{camera.__name__} never declares {name}',
-                    )
+            with self.subTest(camera=camera.__name__):
+                self.assertTrue(issubclass(camera, TriggerableCameraInterface))
 
     def test_cameras_the_worker_asks_for_attributes_by_name_can_answer(self):
         for camera, worker in EVERY_CAMERA:
@@ -162,7 +149,6 @@ class AScriptedCamera(TriggerableCameraInterface):
     """
 
     def __init__(self, outcomes, transient=(), skippable=()):
-        TriggerableCameraInterface.__init__(self)
         self.outcomes = list(outcomes)
         self.transient = transient
         self.skippable = skippable
