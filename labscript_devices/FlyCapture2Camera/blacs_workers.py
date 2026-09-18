@@ -35,7 +35,7 @@ class FlyCapture2_Camera(TriggerableCameraInterface):
     This class handles all of the API/hardware implementation details for the
     corresponding labscript device. It is used by the BLACS worker to send
     appropriate API commands to the camera for the standard BLACS camera operations
-    (i.e. transition_to_buffered, get_attributes, snap, etc).
+    (i.e. transition_to_buffered, get_attributes_as_dict, snap, etc).
     
     Attributes:
         camera (PyCapture2.Camera): Handle to connected camera.
@@ -265,7 +265,7 @@ class FlyCapture2_Camera(TriggerableCameraInterface):
             msg = f"failed to set attribute {name} to {values}"
             raise Exception(msg) from e
         
-    def get_attributes(self, visibility_level, writeable_only=True):
+    def get_attributes_as_dict(self, visibility_level, writeable_only=True):
         """Return a nested dict of all readable attributes.
         
         Args:
@@ -441,18 +441,7 @@ class FlyCapture2_Camera(TriggerableCameraInterface):
 class FlyCapture2CameraWorker(TriggerableCameraWorker):
     """FlyCapture2 API Camera Worker. 
     
-    Inherits from obj:`TriggerableCameraWorker`. Defines :obj:`interface_class` and overloads
-    :obj:`get_attributes_as_dict` to use FlyCapture2Camera.get_attributes() method."""
+    Inherits from obj:`TriggerableCameraWorker`. Defines :obj:`interface_class`."""
     interface_class = FlyCapture2_Camera
-
-    def get_attributes_as_dict(self, visibility_level):
-        """Return a dict of the attributes of the camera for the given visibility
-        level
-        
-        Args:
-            visibility_level (str): Normally configures level of attribute detail
-                to return. Is not used by FlyCapture2_Camera.
-        """
-        return self.camera.get_attributes(visibility_level)
 
 

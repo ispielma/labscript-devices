@@ -80,7 +80,7 @@ class Pylon_Camera(TriggerableCameraInterface):
             msg = f"failed to set attribute {name} to {value}"
             raise Exception(msg) from e
         
-    def get_attributes(self, visibility_level, writeable_only=True):
+    def get_attributes_as_dict(self, visibility_level, writeable_only=True):
         """Return a dict of all attributes of readable attributes, for the given
         visibility level. Optionally return only writeable attributes.
         """
@@ -164,15 +164,9 @@ class Pylon_Camera(TriggerableCameraInterface):
 
 
 class PylonCameraWorker(TriggerableCameraWorker):
-    """Pylon API Camera Worker. 
-    
-    Inherits from TriggerableCameraWorker. Overloads get_attributes_as_dict 
-    to use PylonCamera.get_attributes() method."""
-    interface_class = Pylon_Camera
+    """Pylon API Camera Worker.
 
-    def get_attributes_as_dict(self, visibility_level):
-        """Return a dict of the attributes of the camera for the given visibility
-        level"""
-        return self.camera.get_attributes(visibility_level)
+    Inherits from TriggerableCameraWorker. Defines interface_class."""
+    interface_class = Pylon_Camera
 
 

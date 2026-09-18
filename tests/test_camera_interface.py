@@ -2,8 +2,10 @@
 
 TriggerableCameraWorker duck-types its camera: it calls a set of methods and
 reaches for two attributes, and nothing declares that set anywhere the worker
-can check. A camera missing one of them fails with an AttributeError partway
-through a shot, on hardware, which is the worst place to find out.
+can check. A camera missing one of them fails partway through a shot, on
+hardware, which is the worst place to find out -- with a NotImplementedError
+naming it if it inherits TriggerableCameraInterface, and an AttributeError if
+it does not.
 
 The first test here is that list, checked against every camera in the tree. The
 rest pin the behaviour of the shared grab_multiple, because each vendor's
@@ -17,33 +19,19 @@ import unittest
 
 from labscript_devices.TriggerableCamera.blacs_workers import (
     TriggerableCameraInterface,
-    TriggerableCameraWorker,
 )
-from labscript_devices.IMAQdxCamera.blacs_workers import (
-    IMAQdx_Camera,
-    IMAQdxCameraWorker,
-)
-from labscript_devices.PylonCamera.blacs_workers import (
-    Pylon_Camera,
-    PylonCameraWorker,
-)
-from labscript_devices.SpinnakerCamera.blacs_workers import (
-    Spinnaker_Camera,
-    SpinnakerCameraWorker,
-)
-from labscript_devices.FlyCapture2Camera.blacs_workers import (
-    FlyCapture2_Camera,
-    FlyCapture2CameraWorker,
-)
-from labscript_devices.AndorSolis.blacs_workers import AndorCamera, AndorSolisWorker
-from labscript_devices.DummyCamera.blacs_workers import Dummy_Camera, DummyCameraWorker
+from labscript_devices.IMAQdxCamera.blacs_workers import IMAQdx_Camera
+from labscript_devices.PylonCamera.blacs_workers import Pylon_Camera
+from labscript_devices.SpinnakerCamera.blacs_workers import Spinnaker_Camera
+from labscript_devices.FlyCapture2Camera.blacs_workers import FlyCapture2_Camera
+from labscript_devices.AndorSolis.blacs_workers import AndorCamera
+from labscript_devices.DummyCamera.blacs_workers import Dummy_Camera
 
 
 # What TriggerableCameraWorker calls on self.camera that no base can supply,
 # because there is nothing generic to say: it is all one vendor's API.
 VENDOR_MUST_WRITE = [
     'set_attributes',
-    'get_attribute',
     'snap',
     'grab',
     'configure_acquisition',
@@ -51,14 +39,19 @@ VENDOR_MUST_WRITE = [
     'close',
 ]
 
-# Every camera in the tree, with the worker that drives it.
+# What the inherited, composing get_attributes_as_dict reaches for. Not in the
+# list above because a camera that writes its own get_attributes_as_dict never
+# reads an attribute one at a time and owes neither of these.
+COMPOSING_DEFAULT_NEEDS = ['get_attribute_names', 'get_attribute']
+
+# Every camera in the tree.
 EVERY_CAMERA = [
-    (IMAQdx_Camera, IMAQdxCameraWorker),
-    (Pylon_Camera, PylonCameraWorker),
-    (Spinnaker_Camera, SpinnakerCameraWorker),
-    (FlyCapture2_Camera, FlyCapture2CameraWorker),
-    (AndorCamera, AndorSolisWorker),
-    (Dummy_Camera, DummyCameraWorker),
+    IMAQdx_Camera,
+    Pylon_Camera,
+    Spinnaker_Camera,
+    FlyCapture2_Camera,
+    AndorCamera,
+    Dummy_Camera,
 ]
 
 
@@ -74,23 +67,9 @@ def written_by_the_camera(camera, name):
     return getattr(camera, name, None) is not getattr(TriggerableCameraInterface, name, None)
 
 
-def worker_composes_attributes_by_name(worker):
-    """Whether this worker builds its attribute dict from the camera's names.
-
-    A worker that does needs get_attribute_names and get_attribute on its
-    camera; one that overrides get_attributes_as_dict asks the camera for the
-    whole dict instead and needs neither. Asked of the worker rather than
-    listed here, so the two cannot drift apart.
-    """
-    return (
-        worker.get_attributes_as_dict
-        is TriggerableCameraWorker.get_attributes_as_dict
-    )
-
-
 class ContractTests(unittest.TestCase):
     def test_every_camera_writes_the_members_only_it_can(self):
-        for camera, _ in EVERY_CAMERA:
+        for camera in EVERY_CAMERA:
             for name in VENDOR_MUST_WRITE:
                 with self.subTest(camera=camera.__name__, member=name):
                     self.assertTrue(
@@ -106,19 +85,31 @@ class ContractTests(unittest.TestCase):
         # the base defines them all, so this asks the question that is really
         # being put: are these six still getting them from there. A camera
         # outside the tree need not inherit; the worker duck-types it.
-        for camera, _ in EVERY_CAMERA:
+        for camera in EVERY_CAMERA:
             with self.subTest(camera=camera.__name__):
                 self.assertTrue(issubclass(camera, TriggerableCameraInterface))
 
-    def test_cameras_the_worker_asks_for_attributes_by_name_can_answer(self):
-        for camera, worker in EVERY_CAMERA:
-            if not worker_composes_attributes_by_name(worker):
-                continue
+    def test_every_camera_can_read_its_attributes_as_a_dict(self):
+        # Two ways to satisfy this, and every camera takes one of them: write
+        # get_attributes_as_dict, the way Pylon and FlyCapture2 do because
+        # their APIs hand over the lot in one call, or inherit the composing
+        # default and write the two readers it reaches for.
+        for camera in EVERY_CAMERA:
             with self.subTest(camera=camera.__name__):
-                self.assertTrue(
-                    written_by_the_camera(camera, 'get_attribute_names'),
-                    f'{worker.__name__} builds its attribute dict from the '
-                    f'camera\'s names, but {camera.__name__} does not list them',
+                if written_by_the_camera(camera, 'get_attributes_as_dict'):
+                    continue
+                missing = [
+                    name
+                    for name in COMPOSING_DEFAULT_NEEDS
+                    if not written_by_the_camera(camera, name)
+                ]
+                self.assertEqual(
+                    missing,
+                    [],
+                    f'{camera.__name__} inherits the composing '
+                    f'get_attributes_as_dict but does not implement '
+                    f'{" or ".join(missing)}; it would inherit the stub, '
+                    f'which raises mid-shot',
                 )
 
     def test_an_unwritten_member_names_the_camera_and_the_member(self):

@@ -30,10 +30,9 @@ from labscript_utils.properties import set_attributes
 
 def _unwritten(camera, method):
     """The message for a member of the camera contract a camera has not written."""
-    msg = """%s does not implement %s(), which the camera worker calls. A camera
-        interface class implements every member of the contract in
-        TriggerableCameraInterface, or overrides the worker method that reaches
-        for it."""
+    msg = """%s does not implement %s(). A camera interface class implements
+        every member of the contract in TriggerableCameraInterface, or
+        overrides the method that reaches for it."""
     return dedent(msg) % (type(camera).__name__, method)
 
 
@@ -44,21 +43,20 @@ class TriggerableCameraInterface(object):
     and every camera in labscript_devices implements it: a thin layer over one
     vendor's API, holding no labscript state and knowing nothing about shots.
 
-    The worker calls `set_attributes`, `snap`, `grab`, `grab_multiple`,
-    `configure_acquisition`, `stop_acquisition`, `abort_acquisition` and
-    `close`, and composes the attributes it saves to the shot file from
-    `get_attribute_names` and `get_attribute` unless it overrides
-    `get_attributes_as_dict`. `snap` is called with no acquisition configured
-    and must arrange its own; `grab` is called only between
+    The worker calls `set_attributes`, `get_attributes_as_dict`, `snap`,
+    `grab`, `grab_multiple`, `configure_acquisition`, `stop_acquisition`,
+    `abort_acquisition` and `close`. `snap` is called with no acquisition
+    configured and must arrange its own; `grab` is called only between
     `configure_acquisition` and `stop_acquisition`. An array returned by either
     must stay valid after the next one is taken, since `grab_multiple`
     accumulates them, which is why most cameras copy out of the vendor's
     buffer.
 
     Subclassing this is an offer, not a requirement -- the worker duck-types
-    its camera -- but a camera that does subclass it gets `grab_multiple` and
-    `abort_acquisition` for free and is told which member it has forgotten
-    rather than failing with an AttributeError deep in a shot.
+    its camera -- but a camera that does subclass it gets `grab_multiple`,
+    `abort_acquisition` and the composing `get_attributes_as_dict` for free and
+    is told which member it has forgotten rather than failing with an
+    AttributeError deep in a shot.
     """
 
     # The worker overwrites this on every buffered shot, from the device
@@ -71,9 +69,11 @@ class TriggerableCameraInterface(object):
     # acquisition thread.
     _abort_acquisition = False
 
-    # The members every camera writes for itself. Each raises rather than
-    # doing nothing, because a camera that silently fails to program an
-    # attribute or stop an acquisition is worse than one that does not start.
+    # The members a camera writes for itself. Each raises rather than doing
+    # nothing, because a camera that silently fails to program an attribute or
+    # stop an acquisition is worse than one that does not start. All but the
+    # two attribute readers are owed by every camera; those two are owed only
+    # by a camera that inherits the composing `get_attributes_as_dict` below.
 
     def set_attributes(self, attributes):
         """Program a dict of attribute names and values into the camera."""
@@ -112,6 +112,19 @@ class TriggerableCameraInterface(object):
     def close(self):
         """Release the camera. The worker calls this when it shuts down."""
         raise NotImplementedError(_unwritten(self, 'close'))
+
+    # Reading the attributes back, for the shot file and the BLACS dialog.
+
+    def get_attributes_as_dict(self, visibility_level):
+        """Return a dict of the camera's attributes at the given level of detail.
+
+        Composed here from `get_attribute_names` and `get_attribute`, which is
+        what a camera whose API is read one attribute at a time wants. A camera
+        whose API hands over every attribute in one call overrides this and
+        owes neither of those two.
+        """
+        names = self.get_attribute_names(visibility_level)
+        return {name: self.get_attribute(name) for name in names}
 
     # Acquiring a shot's worth of frames.
 
@@ -254,10 +267,16 @@ class TriggerableCameraWorker(Worker):
 
     def get_attributes_as_dict(self, visibility_level):
         """Return a dict of the attributes of the camera for the given visibility
-        level"""
-        names = self.camera.get_attribute_names(visibility_level)
-        attributes_dict = {name: self.camera.get_attribute(name) for name in names}
-        return attributes_dict
+        level.
+
+        The camera composes the dict; how it does so is its own business, and
+        no worker in the tree overrides this. It is kept as a method rather
+        than inlined into its two callers because a worker outside the tree may
+        override it -- three workers in here did until recently -- and calling
+        the camera directly would ignore such an override without a word,
+        quietly saving different attributes into the shot file.
+        """
+        return self.camera.get_attributes_as_dict(visibility_level)
 
     def get_attributes_as_text(self, visibility_level):
         """Return a string representation of the attributes of the camera for
