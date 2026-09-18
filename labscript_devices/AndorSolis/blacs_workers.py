@@ -23,6 +23,7 @@ class AndorCamera(object):
         self.camera = AndorCam()
         self.attributes = self.camera.default_acquisition_attrs
         self.exception_on_failed_shot = True
+        self._abort_acquisition = False
 
     def set_attributes(self, attr_dict):
         self.attributes.update(attr_dict)
@@ -108,9 +109,6 @@ class AndorCamera(object):
     def abort_acquisition(self):
         self.camera.abort_acquisition()
         self._abort_acquisition = True
-
-    def _decode_image_data(self, img):
-        pass
 
     def close(self):
         self.camera.shutdown()

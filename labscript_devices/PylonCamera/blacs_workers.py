@@ -15,13 +15,10 @@
 # Refactored as a BLACS worker by cbillington
 # Ported to Pylon API by dihm
 
-import numpy as np
-from labscript_utils import dedent
-
 from labscript_devices.TriggerableCamera.blacs_workers import TriggerableCameraWorker
 
-# Don't import API yet so as not to throw an error, allow worker to run as a dummy
-# device, or for subclasses to import this module to inherit classes without requiring API
+# Don't import the API yet so as not to throw an error: subclasses import this module
+# to inherit its classes, and doing so must not require the API
 pylon = None
 genicam = None
 
@@ -126,7 +123,9 @@ class Pylon_Camera(object):
             result.Release()
             return img
         else:
-            raise('Snap Error:',result.ErrorCode,result.ErrorDescription)
+            raise RuntimeError(
+                f'Snap error {result.ErrorCode}: {result.ErrorDescription}'
+            )
 
     def configure_acquisition(self, continuous=True, bufferCount=10):
         """Configure acquisition by calling StartGrabbing with appropriate
@@ -148,7 +147,9 @@ class Pylon_Camera(object):
             result.Release()
             return img
         else:
-            raise('Grab Error:',result.ErrorCode,result.ErrorDescription)
+            raise RuntimeError(
+                f'Grab error {result.ErrorCode}: {result.ErrorDescription}'
+            )
 
     def grab_multiple(self, n_images, images):
         """Grab n_images into images array during buffered acquistion."""

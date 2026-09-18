@@ -17,8 +17,7 @@
 
 import numpy as np
 from labscript_utils import dedent
-from enum import IntEnum
-from time import sleep, perf_counter
+from time import sleep
 
 from labscript_devices.TriggerableCamera.blacs_workers import TriggerableCameraWorker
 
@@ -248,7 +247,6 @@ class Spinnaker_Camera(object):
     def close(self):
         print('Closing down the camera...')
         self.camera.DeInit()
-        self.camList.Clear()
         self.system.ReleaseInstance()
 
 
@@ -258,19 +256,3 @@ class SpinnakerCameraWorker(TriggerableCameraWorker):
     Inherits from TriggerableCameraWorker."""
     interface_class = Spinnaker_Camera
 
-    #def continuous_loop(self, dt):
-    #    """Acquire continuously in a loop, with minimum repetition interval dt"""
-    #    self.camera.trigger()
-    #    while True:
-    #        if dt is not None:
-    #            t = perf_counter()
-    #        image = self.camera.grab()
-    #        self.camera.trigger()
-    #        self._send_image_to_parent(image)
-    #        if dt is None:
-    #            timeout = 0
-    #        else:
-    #            timeout = t + dt - perf_counter()
-    #        if self.continuous_stop.wait(timeout):
-    #            self.continuous_stop.clear()
-    #            break
