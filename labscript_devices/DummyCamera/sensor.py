@@ -34,10 +34,6 @@ from labscript_utils import dedent
 # same, so an image function's floats become this before anything else sees them.
 IMAGE_DTYPE = np.uint16
 
-# The count a frame holds when nothing has said what it should hold.
-BLANK_COUNTS = 0
-
-
 def sensor_size(camera_attributes):
     """The (width, height) in pixels that a dummy camera's attributes give it.
 
@@ -56,14 +52,14 @@ def sensor_size(camera_attributes):
     return int(camera_attributes['Width']), int(camera_attributes['Height'])
 
 
-def sensor_grid(camera_attributes, pixel_size=(1.0, 1.0), magnification=1.0):
+def sensor_grid(camera_attributes, pixel_size, magnification):
     """The meshgrid a dummy camera's image functions are evaluated on.
 
     Object-plane coordinates in micrometres: the sensor's pixels scaled by
     `pixel_size` and `magnification` and centred on the sensor, so that a
     function can model a cloud in physical units without restating the imaging
-    geometry. At the default 1 um pixels and 1x magnification the grid is
-    numerically the pixel indices.
+    geometry. At 1 um pixels and 1x magnification the grid is numerically the
+    pixel indices.
     """
     width, height = sensor_size(camera_attributes)
     pixel_x, pixel_y = pixel_size
@@ -81,15 +77,6 @@ def blank_image(width, height):
     is still a real one, because anything more would be this module modelling
     data, which is the user's function's job and not the camera's.
     """
-    return np.full((height, width), BLANK_COUNTS, dtype=IMAGE_DTYPE)
+    return np.zeros((height, width), dtype=IMAGE_DTYPE)
 
 
-def as_counts(image, saturation):
-    """An image function's array as the camera stores it.
-
-    Clipped to what one of this camera's pixels holds, and in the integer type a
-    sensor reads out: a camera does not return floats, and a value past full
-    well saturates rather than wrapping around.
-    """
-    image = np.asarray(image, dtype=float)
-    return np.clip(image, 0, saturation).astype(IMAGE_DTYPE)

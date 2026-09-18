@@ -200,6 +200,17 @@ class TriggerableCameraWorker(Worker):
         self.set_attributes_smart(self.camera_attributes)
         self.set_attributes_smart(self.manual_mode_camera_attributes)
         print("Initialisation complete")
+        self._clear_shot_state()
+        self.continuous_stop = threading.Event()
+        self.continuous_thread = None
+        self.continuous_dt = None
+        self.image_socket = Context().socket(zmq.REQ)
+        self.image_socket.connect(
+            f'tcp://{self.parent_host}:{self.image_receiver_port}'
+        )
+
+    def _clear_shot_state(self):
+        """Forget the shot just finished, or the one that never started."""
         self.images = None
         self.n_images = None
         self.attributes_to_save = None
@@ -208,13 +219,6 @@ class TriggerableCameraWorker(Worker):
         self.h5_filepath = None
         self.stop_acquisition_timeout = None
         self.exception_on_failed_shot = None
-        self.continuous_stop = threading.Event()
-        self.continuous_thread = None
-        self.continuous_dt = None
-        self.image_socket = Context().socket(zmq.REQ)
-        self.image_socket.connect(
-            f'tcp://{self.parent_host}:{self.image_receiver_port}'
-        )
 
     def get_camera(self):
         """Return an instance of the camera interface class. Subclasses may override
@@ -441,13 +445,7 @@ class TriggerableCameraWorker(Worker):
         else:
             self._send_image_to_parent(image_block)
 
-        self.images = None
-        self.n_images = None
-        self.attributes_to_save = None
-        self.exposures = None
-        self.h5_filepath = None
-        self.stop_acquisition_timeout = None
-        self.exception_on_failed_shot = None
+        self._clear_shot_state()
         print("Setting manual mode camera attributes.\n")
         self.set_attributes_smart(self.manual_mode_camera_attributes)
         if self.continuous_dt is not None:
@@ -463,14 +461,7 @@ class TriggerableCameraWorker(Worker):
             self.acquisition_thread = None
             self.camera.stop_acquisition()
         self.camera._abort_acquisition = False
-        self.images = None
-        self.n_images = None
-        self.attributes_to_save = None
-        self.exposures = None
-        self.acquisition_thread = None
-        self.h5_filepath = None
-        self.stop_acquisition_timeout = None
-        self.exception_on_failed_shot = None
+        self._clear_shot_state()
         # Resume continuous acquisition, if any:
         if self.continuous_dt is not None and self.continuous_thread is None:
             self.start_continuous(self.continuous_dt)
