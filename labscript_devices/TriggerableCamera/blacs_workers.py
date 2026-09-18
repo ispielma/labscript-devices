@@ -265,23 +265,10 @@ class TriggerableCameraWorker(Worker):
                 self.smart_cache[name] = value
         self.camera.set_attributes(uncached_attributes)
 
-    def get_attributes_as_dict(self, visibility_level):
-        """Return a dict of the attributes of the camera for the given visibility
-        level.
-
-        The camera composes the dict; how it does so is its own business, and
-        no worker in the tree overrides this. It is kept as a method rather
-        than inlined into its two callers because a worker outside the tree may
-        override it -- three workers in here did until recently -- and calling
-        the camera directly would ignore such an override without a word,
-        quietly saving different attributes into the shot file.
-        """
-        return self.camera.get_attributes_as_dict(visibility_level)
-
     def get_attributes_as_text(self, visibility_level):
         """Return a string representation of the attributes of the camera for
         the given visibility level"""
-        attrs = self.get_attributes_as_dict(visibility_level)
+        attrs = self.camera.get_attributes_as_dict(visibility_level)
         # Format it nicely:
         lines = [f'    {repr(key)}: {repr(value)},' for key, value in attrs.items()]
         dict_repr = '\n'.join(['{'] + lines + ['}'])
@@ -375,7 +362,9 @@ class TriggerableCameraWorker(Worker):
         self.set_attributes_smart(camera_attributes)
         # Get the camera attributes, so that we can save them to the H5 file:
         if saved_attr_level is not None:
-            self.attributes_to_save = self.get_attributes_as_dict(saved_attr_level)
+            self.attributes_to_save = self.camera.get_attributes_as_dict(
+                saved_attr_level
+            )
         else:
             self.attributes_to_save = None
         print(f"Configuring camera for {self.n_images} images.")
