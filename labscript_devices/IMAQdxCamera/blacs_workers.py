@@ -21,9 +21,8 @@ from labscript_devices.TriggerableCamera.blacs_workers import (
     TriggerableCameraWorker,
 )
 
-# Don't import nv yet so as not to throw an error, allow worker to run as a dummy
-# device, or for subclasses to import this module to inherit classes without requiring
-# nivision
+# Don't import nv yet so as not to throw an error: subclasses import this module to
+# inherit its classes, and doing so must not require nivision
 nv = None
 
 

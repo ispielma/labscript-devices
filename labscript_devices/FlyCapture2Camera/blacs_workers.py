@@ -22,8 +22,8 @@ from enum import IntEnum
 
 from labscript_devices.TriggerableCamera.blacs_workers import TriggerableCameraWorker
 
-# Don't import API yet so as not to throw an error, allow worker to run as a dummy
-# device, or for subclasses to import this module to inherit classes without requiring API
+# Don't import the API yet so as not to throw an error: subclasses import this module
+# to inherit its classes, and doing so must not require the API
 PyCapture2 = None
 
 class FlyCapture2_Camera(object):

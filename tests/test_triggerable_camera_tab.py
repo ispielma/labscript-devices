@@ -1,9 +1,15 @@
-"""The IMAQdx camera tab's attribute-copy button.
+"""The camera tab's attribute-copy button.
 
-on_copy_clicked reached for QApplication under the module it lived in before
-Qt5, so the Copy button in the camera's attributes dialog raised AttributeError
-rather than copying anything. Only the clipboard call needs a Qt application;
-the tab itself is never constructed here, so no camera has to be attached.
+on_copy_clicked reaches for QApplication under QtWidgets, where it has lived
+since Qt5; asking QtGui for it raises AttributeError and the Copy button in
+the attributes dialog copies nothing. Only the clipboard call needs a Qt
+application; the tab itself is never constructed here, so no camera has to be
+attached.
+
+The button belongs to TriggerableCameraTab, which every camera inherits, so
+that is what this tests -- reaching it through a vendor subclass would move
+the test off its subject the moment that subclass grew a copy button of its
+own.
 """
 import unittest
 
@@ -12,7 +18,7 @@ import h5py
 
 from qtutils.qt import QtWidgets
 
-from labscript_devices.IMAQdxCamera.blacs_tabs import IMAQdxCameraTab
+from labscript_devices.TriggerableCamera.blacs_tabs import TriggerableCameraTab
 
 
 ATTRIBUTES = 'AcquisitionAttributes::Bitspp: 8\nCameraAttributes::Gain: 1.0\n'
@@ -36,7 +42,7 @@ class CopyAttributesTests(unittest.TestCase):
         self.qapplication = a_qapplication()
         # __init__ builds a whole BLACS tab against a camera; on_copy_clicked
         # reads only the dialog, so give it one and nothing else:
-        self.tab = IMAQdxCameraTab.__new__(IMAQdxCameraTab)
+        self.tab = TriggerableCameraTab.__new__(TriggerableCameraTab)
         self.tab.attributes_dialog = AnAttributesDialog(ATTRIBUTES)
         self.qapplication.clipboard().clear()
 
