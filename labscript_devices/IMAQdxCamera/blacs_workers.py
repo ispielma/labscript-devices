@@ -14,16 +14,15 @@
 # Original imaqdx_camera server by dt, with modifications by rpanderson and cbillington.
 # Refactored as a BLACS worker by cbillington
 
-import sys
 import numpy as np
 
 from labscript_devices.TriggerableCamera.blacs_workers import (
+    TriggerableCameraInterface,
     TriggerableCameraWorker,
 )
 
-# Don't import nv yet so as not to throw an error, allow worker to run as a dummy
-# device, or for subclasses to import this module to inherit classes without requiring
-# nivision
+# Don't import nv yet so as not to throw an error: subclasses import this module to
+# inherit its classes, and doing so must not require nivision
 nv = None
 
 
@@ -52,7 +51,7 @@ def _monkeypatch_imaqdispose():
     nivision.core.imaqDispose = nv.imaqDispose = imaqDispose
 
 
-class IMAQdx_Camera(object):
+class IMAQdx_Camera(TriggerableCameraInterface):
     def __init__(self, serial_number):
         global nv
         import nivision as nv
@@ -74,8 +73,6 @@ class IMAQdx_Camera(object):
         )
         # Keep an img attribute so we don't have to create it every time
         self.img = nv.imaqCreateImage(nv.IMAQ_IMAGE_U16)
-        self.exception_on_failed_shot = True
-        self._abort_acquisition = False
 
     def set_attributes(self, attr_dict):
         for k, v in attr_dict.items():
@@ -139,40 +136,20 @@ class IMAQdx_Camera(object):
         nv.IMAQdxGrab(self.imaqdx, self.img, waitForNextBuffer=waitForNextBuffer)
         return self._decode_image_data(self.img)
 
-    def grab_multiple(self, n_images, images, waitForNextBuffer=True):
-        print(f"Attempting to grab {n_images} images.")
-        for i in range(n_images):
-            while True:
-                if self._abort_acquisition:
-                    print("Abort during acquisition.")
-                    self._abort_acquisition = False
-                    return
-                try:
-                    images.append(self.grab(waitForNextBuffer))
-                    print(f"Got image {i+1} of {n_images}.")
-                    break
-                except nv.ImaqDxError as e:
-                    if e.code == nv.IMAQdxErrorTimeout.value:
-                        print('.', end='')
-                        continue
-                    
-                    if self.exception_on_failed_shot:
-                        raise
-                    else:
-                        # stop acquisition
-                        print(e, file=sys.stderr)
-                        break
-                    
-                    
-                    
-        print(f"Got {len(images)} of {n_images} images.")
+    def is_transient_grab_error(self, exception):
+        """IMAQdx reports a frame that has not arrived yet as a timeout."""
+        return (
+            isinstance(exception, nv.ImaqDxError)
+            and exception.code == nv.IMAQdxErrorTimeout.value
+        )
+
+    def is_skippable_grab_error(self, exception):
+        """Anything else IMAQdx itself reports, as against a fault above it."""
+        return isinstance(exception, nv.ImaqDxError)
 
     def stop_acquisition(self):
         nv.IMAQdxStopAcquisition(self.imaqdx)
         nv.IMAQdxUnconfigureAcquisition(self.imaqdx)
-
-    def abort_acquisition(self):
-        self._abort_acquisition = True
 
     def _decode_image_data(self, img):
         img_array = nv.imaqImageToArray(img)

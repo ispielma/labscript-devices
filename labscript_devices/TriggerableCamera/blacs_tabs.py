@@ -15,7 +15,6 @@ import os
 import json
 from time import perf_counter
 import ast
-from queue import Empty
 
 import labscript_utils.h5_lock
 import h5py
@@ -24,7 +23,7 @@ import numpy as np
 
 from qtutils import UiLoader, inmain_decorator
 import qtutils.icons
-from qtutils.qt import QtWidgets, QtGui, QtCore
+from qtutils.qt import QtWidgets, QtCore
 import pyqtgraph as pg
 
 from blacs.tab_base_classes import define_state, MODE_MANUAL

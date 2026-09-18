@@ -15,11 +15,12 @@ from labscript_utils import dedent
 
 from labscript_devices.DummyCamera.sensor import blank_image, sensor_size
 from labscript_devices.TriggerableCamera.blacs_workers import (
+    TriggerableCameraInterface,
     TriggerableCameraWorker,
 )
 
 
-class Dummy_Camera(object):
+class Dummy_Camera(TriggerableCameraInterface):
     """A camera whose frames were computed when the shot was compiled.
 
     It presents the interface every camera interface class presents, and
@@ -39,8 +40,6 @@ class Dummy_Camera(object):
     def __init__(self, serial_number=None):
         print("Starting device worker as a dummy camera")
         self.attributes = dict(self.identifying_attributes)
-        self.exception_on_failed_shot = True
-        self._abort_acquisition = False
         self.images = None
         self.index = 0
 
@@ -88,22 +87,8 @@ class Dummy_Camera(object):
         self.index += 1
         return image
 
-    def grab_multiple(self, n_images, images, waitForNextBuffer=True):
-        print(f"Attempting to grab {n_images} images.")
-        for i in range(n_images):
-            if self._abort_acquisition:
-                print("Abort during acquisition.")
-                self._abort_acquisition = False
-                return
-            images.append(self.grab())
-            print(f"Got image {i+1} of {n_images}.")
-        print(f"Got {len(images)} of {n_images} images.")
-
     def stop_acquisition(self):
         pass
-
-    def abort_acquisition(self):
-        self._abort_acquisition = True
 
     def close(self):
         pass

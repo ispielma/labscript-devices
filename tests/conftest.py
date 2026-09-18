@@ -7,7 +7,7 @@ them, and there are two separate ways they otherwise would.
 unhandled exception then spawns a separate tkinter subprocess window, up to ten
 at once. A single bad run leaves a pile of them to close by hand.
 
-`test_imaqdx_camera_tab.py` reaches Qt, and a widget that is ever shown reaches
+`test_triggerable_camera_tab.py` reaches Qt, and a widget that is ever shown reaches
 the screen with it. Rendering offscreen is what lets a test show a real widget
 without one appearing — the fix for such a test is never to stop showing it,
 because Qt does not lay out or paint a widget that was never shown, and the
