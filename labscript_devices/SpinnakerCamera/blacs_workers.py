@@ -227,10 +227,6 @@ class Spinnaker_Camera(TriggerableCameraInterface):
         print('Stream info: %s frames acquired, %s failed, %s underrun' %
               (str(num_frames), str(failed_frames), str(underrun_frames)))
 
-    def abort_acquisition(self):
-        print('Stopping acquisition...')
-        TriggerableCameraInterface.abort_acquisition(self)
-
     def close(self):
         print('Closing down the camera...')
         self.camera.DeInit()
