@@ -20,7 +20,7 @@ from labscript_utils import dedent
 from enum import IntEnum
 from time import sleep, perf_counter
 
-from labscript_devices.IMAQdxCamera.blacs_workers import IMAQdxCameraWorker
+from labscript_devices.TriggerableCamera.blacs_workers import TriggerableCameraWorker
 
 class Spinnaker_Camera(object):
     def __init__(self, serial_number):
@@ -252,10 +252,10 @@ class Spinnaker_Camera(object):
         self.system.ReleaseInstance()
 
 
-class SpinnakerCameraWorker(IMAQdxCameraWorker):
+class SpinnakerCameraWorker(TriggerableCameraWorker):
     """Spinnaker API Camera Worker.
 
-    Inherits from IMAQdxCameraWorker."""
+    Inherits from TriggerableCameraWorker."""
     interface_class = Spinnaker_Camera
 
     #def continuous_loop(self, dt):

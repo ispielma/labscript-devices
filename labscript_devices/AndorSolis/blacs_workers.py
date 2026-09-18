@@ -11,7 +11,9 @@
 #                                                                   #
 #####################################################################
 from zprocess import rich_print
-from labscript_devices.IMAQdxCamera.blacs_workers import MockCamera, IMAQdxCameraWorker
+from labscript_devices.TriggerableCamera.blacs_workers import (
+    TriggerableCameraWorker,
+)
 
 class AndorCamera(object):
 
@@ -113,16 +115,13 @@ class AndorCamera(object):
     def close(self):
         self.camera.shutdown()
 
-class AndorSolisWorker(IMAQdxCameraWorker):
+class AndorSolisWorker(TriggerableCameraWorker):
 
     interface_class = AndorCamera
 
     def get_camera(self):
         """ Andor cameras may not be specified by serial numbers"""
-        if self.mock:
-            return MockCamera()
-        else:
-            return self.interface_class()
+        return self.interface_class()
             
     def get_attributes_as_dict(self, visibility_level):
         """Return a dict of the attributes of the camera for the given visibility
