@@ -19,9 +19,12 @@ import numpy as np
 from labscript_utils import dedent
 from time import sleep
 
-from labscript_devices.TriggerableCamera.blacs_workers import TriggerableCameraWorker
+from labscript_devices.TriggerableCamera.blacs_workers import (
+    TriggerableCameraInterface,
+    TriggerableCameraWorker,
+)
 
-class Spinnaker_Camera(object):
+class Spinnaker_Camera(TriggerableCameraInterface):
     def __init__(self, serial_number):
         """Initialize Spinnaker API camera.
 
@@ -53,8 +56,6 @@ class Spinnaker_Camera(object):
         self.timeout = 5000 # in ms
 
         # Set the abort acquisition thingy:
-        self._abort_acquisition = False
-        self.exception_on_failed_shot = True
 
     def get_attribute_names(self, visibility):
         names = []
@@ -158,20 +159,6 @@ class Spinnaker_Camera(object):
         image_result.Release()
         return img
 
-    def grab_multiple(self, n_images, images):
-        """Grab n_images into images array during buffered acquistion."""
-        print(f"Attempting to grab {n_images} images.")
-        for i in range(n_images):
-            if self._abort_acquisition:
-                print("Abort during acquisition.")
-                self._abort_acquisition = False
-                return
-
-            images.append(self.grab())
-            print(f"Got image {i+1} of {n_images}.")
-        print(f"Got {len(images)} of {n_images} images.")
-
-
     def trigger(self):
         """Execute software trigger"""
         nodemap = self.camera.GetNodeMap()
@@ -242,7 +229,7 @@ class Spinnaker_Camera(object):
 
     def abort_acquisition(self):
         print('Stopping acquisition...')
-        self._abort_acquisition = True
+        TriggerableCameraInterface.abort_acquisition(self)
 
     def close(self):
         print('Closing down the camera...')

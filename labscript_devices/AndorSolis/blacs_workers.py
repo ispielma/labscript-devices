@@ -12,18 +12,18 @@
 #####################################################################
 from zprocess import rich_print
 from labscript_devices.TriggerableCamera.blacs_workers import (
+    TriggerableCameraInterface,
     TriggerableCameraWorker,
 )
 
-class AndorCamera(object):
+class AndorCamera(TriggerableCameraInterface):
 
     def __init__(self):
+        TriggerableCameraInterface.__init__(self)
         global AndorCam
         from .andor_sdk.andor_utils import AndorCam
         self.camera = AndorCam()
         self.attributes = self.camera.default_acquisition_attrs
-        self.exception_on_failed_shot = True
-        self._abort_acquisition = False
 
     def set_attributes(self, attr_dict):
         self.attributes.update(attr_dict)
@@ -107,8 +107,10 @@ class AndorCamera(object):
         pass
 
     def abort_acquisition(self):
+        # The SDK call is what unblocks a download already in flight; the
+        # flag is what stops the loop between acquisitions.
         self.camera.abort_acquisition()
-        self._abort_acquisition = True
+        TriggerableCameraInterface.abort_acquisition(self)
 
     def close(self):
         self.camera.shutdown()
