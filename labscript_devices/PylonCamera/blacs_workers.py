@@ -15,14 +15,17 @@
 # Refactored as a BLACS worker by cbillington
 # Ported to Pylon API by dihm
 
-from labscript_devices.TriggerableCamera.blacs_workers import TriggerableCameraWorker
+from labscript_devices.TriggerableCamera.blacs_workers import (
+    TriggerableCameraInterface,
+    TriggerableCameraWorker,
+)
 
 # Don't import the API yet so as not to throw an error: subclasses import this module
 # to inherit its classes, and doing so must not require the API
 pylon = None
 genicam = None
 
-class Pylon_Camera(object):
+class Pylon_Camera(TriggerableCameraInterface):
     def __init__(self, serial_number):
         
         global pylon
@@ -41,8 +44,6 @@ class Pylon_Camera(object):
                         pylon.RegistrationMode_ReplaceAll, pylon.Cleanup_Delete)
         # Keep a nodeMap reference so we don't have to re-create a lot
         self.nodeMap = self.camera.GetNodeMap()
-        self._abort_acquisition = False
-        self.exception_on_failed_shot = True
 
 
     def set_attributes(self, attributes_dict):
@@ -151,29 +152,12 @@ class Pylon_Camera(object):
                 f'Grab error {result.ErrorCode}: {result.ErrorDescription}'
             )
 
-    def grab_multiple(self, n_images, images):
-        """Grab n_images into images array during buffered acquistion."""
-        print(f"Attempting to grab {n_images} images.")
-        for i in range(n_images):
-            while True:
-                if self._abort_acquisition:
-                    print("Abort during acquisition.")
-                    self._abort_acquisition = False
-                    return
-                try:
-                    images.append(self.grab(continuous=False))
-                    print(f"Got image {i+1} of {n_images}.")
-                    break
-                except pylon.TimeoutException as e:
-                    print('.', end='')
-                    continue
-        print(f"Got {len(images)} of {n_images} images.")
+    def is_transient_grab_error(self, exception):
+        """Pylon reports a frame that has not arrived yet as a timeout."""
+        return isinstance(exception, pylon.TimeoutException)
 
     def stop_acquisition(self):
         self.camera.StopGrabbing()
-
-    def abort_acquisition(self):
-        self._abort_acquisition = True
 
     def close(self):
         self.camera.Close()
