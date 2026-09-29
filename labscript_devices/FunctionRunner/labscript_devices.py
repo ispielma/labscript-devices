@@ -72,7 +72,7 @@ class FunctionRunner(Device):
         from within a function to be run at the end of a shot, like so:
 
             import runmanager.remote
-            runmanager.remote.set_globals({'x': 7})
+            runmanager.remote.set_values({'x': 7})
 
         """
         name, source, args, kwargs = serialise_function(function, *args, **kwargs)
