@@ -13,9 +13,11 @@ names an interface class.
 That interface class is the object the worker talks to in place of hardware,
 and :obj:`~labscript_devices.TriggerableCamera.blacs_workers.TriggerableCameraInterface`
 is what it implements: the contract the worker calls, an acquisition loop, and
-an abort. Inheriting it is an offer rather than a requirement -- the worker
-duck-types its camera -- but a camera that does is told which member it has
-not written, rather than failing partway through a shot.
+an abort. A camera should inherit it; a member it has not written then raises
+an error naming that member, rather than an AttributeError. A camera that does
+not must write every member the worker calls; a worker subclassing
+:obj:`~labscript_devices.IMAQdxCamera.blacs_workers.IMAQdxCameraWorker` still
+reads such a camera's attributes one at a time, but that route is deprecated.
 
 .. autosummary::
    labscript_devices.TriggerableCamera.labscript_devices
