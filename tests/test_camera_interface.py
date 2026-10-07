@@ -79,12 +79,9 @@ class ContractTests(unittest.TestCase):
                     )
 
     def test_every_camera_in_the_tree_inherits_the_base(self):
-        # The rest of the contract -- grab_multiple, abort_acquisition, and the
-        # two flags the acquisition loop reads back -- is what inheriting
-        # supplies. Asking whether each name resolves would answer itself once
-        # the base defines them all, so this asks the question that is really
-        # being put: are these six still getting them from there. A camera
-        # outside the tree need not inherit; the worker duck-types it.
+        # Inheriting supplies grab_multiple, abort_acquisition and the flags the
+        # acquisition loop reads, so this asks whether each camera still gets
+        # them from the base, not merely whether each name resolves.
         for camera in EVERY_CAMERA:
             with self.subTest(camera=camera.__name__):
                 self.assertTrue(issubclass(camera, TriggerableCameraInterface))
