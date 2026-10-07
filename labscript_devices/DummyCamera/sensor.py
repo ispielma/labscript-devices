@@ -34,6 +34,7 @@ from labscript_utils import dedent
 # same, so an image function's floats become this before anything else sees them.
 IMAGE_DTYPE = np.uint16
 
+
 def sensor_size(camera_attributes):
     """The (width, height) in pixels that a dummy camera's attributes give it.
 
@@ -52,22 +53,6 @@ def sensor_size(camera_attributes):
     return int(camera_attributes['Width']), int(camera_attributes['Height'])
 
 
-def sensor_grid(camera_attributes, pixel_size, magnification):
-    """The meshgrid a dummy camera's image functions are evaluated on.
-
-    Object-plane coordinates in micrometres: the sensor's pixels scaled by
-    `pixel_size` and `magnification` and centred on the sensor, so that a
-    function can model a cloud in physical units without restating the imaging
-    geometry. At 1 um pixels and 1x magnification the grid is numerically the
-    pixel indices.
-    """
-    width, height = sensor_size(camera_attributes)
-    pixel_x, pixel_y = pixel_size
-    x = (np.arange(width) - (width - 1) / 2) * pixel_x / magnification
-    y = (np.arange(height) - (height - 1) / 2) * pixel_y / magnification
-    return np.meshgrid(x, y)
-
-
 def blank_image(width, height):
     """A valid frame with nothing in it.
 
@@ -78,5 +63,3 @@ def blank_image(width, height):
     data, which is the user's function's job and not the camera's.
     """
     return np.zeros((height, width), dtype=IMAGE_DTYPE)
-
-
