@@ -19,7 +19,6 @@ from labscript_utils import dedent
 from labscript_devices.DummyCamera.sensor import (
     IMAGE_DTYPE,
     blank_image,
-    sensor_grid,
     sensor_size,
 )
 from labscript_devices.TriggerableCamera.labscript_devices import TriggerableCamera
@@ -122,12 +121,15 @@ class DummyCamera(TriggerableCamera):
     def coordinate_grid(self):
         """The meshgrid every one of this camera's image functions is evaluated on.
 
-        Object-plane micrometres, from the `Width` and `Height` in this camera's
-        attributes and from the `pixel_size` and `magnification` it was given.
+        Object-plane micrometres, centred on the sensor: the `Width` and `Height`
+        pixels in this camera's attributes, scaled by its `pixel_size` and
+        `magnification`.
         """
-        return sensor_grid(
-            self.camera_attributes, self.pixel_size, self.magnification
-        )
+        width, height = sensor_size(self.camera_attributes)
+        pixel_x, pixel_y = self.pixel_size
+        x = (np.arange(width) - (width - 1) / 2) * pixel_x / self.magnification
+        y = (np.arange(height) - (height - 1) / 2) * pixel_y / self.magnification
+        return np.meshgrid(x, y)
 
     def saturation(self):
         """The largest count a pixel of this camera can hold.
@@ -143,16 +145,6 @@ class DummyCamera(TriggerableCamera):
         match = re.search(r'(\d+)$', pixel_format)
         bit_depth = int(match.group(1)) if match else DEFAULT_BIT_DEPTH
         return 2 ** min(bit_depth, DEFAULT_BIT_DEPTH) - 1
-
-    def as_counts(self, image):
-        """An image function's array as this camera stores it.
-
-        Clipped to what one of its pixels holds, and in the integer type a
-        sensor reads out: a camera does not return floats, and a value past
-        full well saturates rather than wrapping around.
-        """
-        image = np.asarray(image, dtype=float)
-        return np.clip(image, 0, self.saturation()).astype(IMAGE_DTYPE)
 
     def generate_code(self, hdf5_file):
         TriggerableCamera.generate_code(self, hdf5_file)
@@ -202,5 +194,6 @@ class DummyCamera(TriggerableCamera):
                         t,
                     )
                 )
-            images.append(self.as_counts(image))
+            counts = np.clip(image.astype(float), 0, self.saturation())
+            images.append(counts.astype(IMAGE_DTYPE))
         group.create_dataset('IMAGES', data=np.array(images), compression='gzip')
