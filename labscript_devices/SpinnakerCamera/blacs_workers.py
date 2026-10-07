@@ -55,8 +55,6 @@ class Spinnaker_Camera(TriggerableCameraInterface):
         # Set the timeout to 5 s:
         self.timeout = 5000 # in ms
 
-        # Set the abort acquisition thingy:
-
     def get_attribute_names(self, visibility):
         names = []
         def get_node_names_in_category(node_category, prefix=''):

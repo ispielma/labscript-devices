@@ -29,6 +29,7 @@ from labscript_devices.DummyCamera.blacs_workers import (
     Dummy_Camera,
     DummyCameraWorker,
 )
+from labscript_devices.IMAQdxCamera.blacs_workers import IMAQdxCameraWorker
 import labscript_devices.TriggerableCamera.blacs_workers as camera_workers
 from labscript_devices.TriggerableCamera.blacs_workers import TriggerableCameraWorker
 
@@ -197,6 +198,8 @@ class DummyCameraTestCase(CompileTestCase):
     whether the images followed it.
     """
 
+    worker_class = DummyCameraWorker
+
     def setUp(self):
         super().setUp()
         self.shot_count = 0
@@ -220,7 +223,7 @@ class DummyCameraTestCase(CompileTestCase):
         ends up holding can be compared against them.
         """
         compiled = self.compile_with_globals(**shot_globals)
-        worker = DummyCameraWorker.__new__(DummyCameraWorker)
+        worker = self.worker_class.__new__(self.worker_class)
         # What BLACS passes a camera worker when it starts it:
         worker.device_name = 'camera'
         worker.serial_number = 0x0
@@ -491,6 +494,40 @@ class UnsavedAttributeTests(DummyCameraTestCase):
         self.assertTrue(attrs['NOT_REAL_DATA'])
         # The rest of them really are switched off.
         self.assertNotIn('Width', attrs)
+
+
+class AnOldStyleCamera:
+    """A camera written as upstream documents one: a plain class that reads its
+    attributes one at a time, with no get_attributes_as_dict."""
+
+    def __init__(self, serial_number):
+        self._camera = Dummy_Camera(serial_number)
+
+    def __getattr__(self, name):
+        if name == 'get_attributes_as_dict':
+            raise AttributeError(name)
+        return getattr(self._camera, name)
+
+
+class AnOldStyleWorker(DummyCameraWorker, IMAQdxCameraWorker):
+    """A lab's own worker, subclassing IMAQdxCameraWorker to drive that camera."""
+
+    interface_class = AnOldStyleCamera
+
+
+class OldStyleCameraTests(DummyCameraTestCase):
+    shot = ABSORPTION_SHOT
+    worker_class = AnOldStyleWorker
+
+    def test_a_camera_without_the_interface_still_runs_a_shot(self):
+        compiled = self.run_the_shot(optical_density=2.0)
+
+        with h5py.File(self.run_file, 'r') as f:
+            atoms = f['images/camera/absorption/atoms'][:]
+            attrs = dict(f['images/camera'].attrs)
+
+        np.testing.assert_array_equal(atoms, compiled[0])
+        self.assertEqual(attrs['Width'], 64)
 
 
 class PlaybackTests(unittest.TestCase):
