@@ -52,11 +52,12 @@ class TriggerableCameraInterface(object):
     accumulates them, which is why most cameras copy out of the vendor's
     buffer.
 
-    Subclassing this is an offer, not a requirement -- the worker duck-types
-    its camera -- but a camera that does subclass it gets `grab_multiple`,
-    `abort_acquisition` and the composing `get_attributes_as_dict` for free and
-    is told which member it has forgotten rather than failing with an
-    AttributeError deep in a shot.
+    A camera should subclass this. It then gets `grab_multiple`,
+    `abort_acquisition` and the composing `get_attributes_as_dict` for free,
+    and is told which member it has forgotten rather than failing with an
+    AttributeError deep in a shot. One that does not must write every member
+    the worker calls, except that a worker subclassing `IMAQdxCameraWorker`
+    builds `get_attributes_as_dict` for it, a route that is deprecated.
     """
 
     # The worker overwrites this on every buffered shot, from the device

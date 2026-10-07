@@ -14,8 +14,12 @@
 # Original imaqdx_camera server by dt, with modifications by rpanderson and cbillington.
 # Refactored as a BLACS worker by cbillington
 
+import sys
+from types import MethodType
+
 import numpy as np
 
+from labscript_utils import dedent
 from labscript_devices.TriggerableCamera.blacs_workers import (
     TriggerableCameraInterface,
     TriggerableCameraWorker,
@@ -165,9 +169,26 @@ class IMAQdx_Camera(TriggerableCameraInterface):
 
 
 class IMAQdxCameraWorker(TriggerableCameraWorker):
-    """Thin sub-class of :obj:`TriggerableCameraWorker`.
+    """Worker for :obj:`IMAQdx_Camera`.
 
-    This sub-class only defines :obj:`interface_class` to point to the
-    :obj:`IMAQdx_Camera` interface."""
+    A subclass of this may name a camera that does not subclass
+    :obj:`TriggerableCameraInterface`, and the camera's attributes are then read
+    one at a time. That route is deprecated, and says so when the worker starts.
+    """
 
     interface_class = IMAQdx_Camera
+
+    def init(self):
+        super().init()
+        # Here rather than in get_camera, which a lab's own worker may override.
+        if not hasattr(self.camera, 'get_attributes_as_dict'):
+            msg = f"""Warning: {type(self.camera).__name__} does not subclass
+                TriggerableCameraInterface. Driving such a camera by subclassing
+                IMAQdxCameraWorker is deprecated. Use the TriggerableCamera
+                device, with a camera class that subclasses
+                TriggerableCameraInterface and a worker that subclasses
+                TriggerableCameraWorker."""
+            print(dedent(msg), file=sys.stderr)
+            self.camera.get_attributes_as_dict = MethodType(
+                TriggerableCameraInterface.get_attributes_as_dict, self.camera
+            )
