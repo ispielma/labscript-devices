@@ -86,12 +86,12 @@ class AlazarTechBoard(Device):
     @set_passed_properties(property_names={
         "device_properties": ["ats_system_id", "ats_board_id",
                               "requested_acquisition_rate", "acquisition_duration",
-                              "clock_source_id", "sample_rate_id_or_value", "clock_edge_id", "decimation",
+                              "clock_source_id", "sample_rate_id", "clock_edge_id", "decimation",
                               "trig_operation",
                               "trig_engine_id1", "trig_source_id1", "trig_slope_id1",  "trig_level_id1",
                               "trig_engine_id2", "trig_source_id2", "trig_slope_id2", "trig_level_id2",
                               "exttrig_coupling_id", "exttrig_range_id",
-                              "trig_delay_samples", "trig_timeout_10usecs", "input_range",
+                              "trig_delay_samples", "trig_timeout_10usecs",
                               "channels",
                               "chA_coupling_id", "chA_input_range", "chA_impedance_id", "chA_bw_limit",
                               "chB_coupling_id", "chB_input_range", "chB_impedance_id", "chB_bw_limit"
@@ -517,7 +517,7 @@ class GuilessWorker(Worker):
             command = self.acquisition_queue.get()
             assert command == 'start'
             #print("acquisition thread: starting new acquisition")
-            start = time.clock()               # Keep track of when acquisition started
+            start = time.perf_counter()        # Keep track of when acquisition started
             # This is a fresh trip through the acquisition loop, no exception has occurred yet!
             self.acquisition_exception = None
             self.acquisition_done.clear()      # I don't understand why this is needed here!
@@ -542,11 +542,11 @@ class GuilessWorker(Worker):
                 print("\n\nAPI error string is: {:s}".format(errstring))
                 # Even if in an abort, we still process this exception up to the main thread via shared state
                 self.acquisition_exception = sys.exc_info()
-                print("acquisition thread: acquisition_exception is {:s}".format(
+                print("acquisition thread: acquisition_exception is {}".format(
                     self.acquisition_exception))
                 continue  # Next iteration of the infinite loop, wait for next acquisition, or have the main thread decide to die
             except Exception as e:
-                print("Got some other exception {:s}".format(e))
+                print("Got some other exception {}".format(e))
                 self.acquisition_exception = sys.exc_info()
                 continue  # Next iteration of the infinite loop, wait for next acquisition, or have the main thread decide to die
             finally:
@@ -647,8 +647,8 @@ class GuilessWorker(Worker):
     def shutdown(self):
         if self.aborting:
             print('Shutdown requested during abort; waiting 10 seconds.')
-            start = time.clock()
-            while self.aborting and time.clock() - start < 10:
+            start = time.perf_counter()
+            while self.aborting and time.perf_counter() - start < 10:
                 time.sleep(0.5)
         if self.aborting:
             print('Proceeding in lieu of complete abort.')
