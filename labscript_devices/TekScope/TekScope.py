@@ -127,8 +127,8 @@ class TekScope:
     def set_date_time(self, verbose=False):
         if verbose:
             print('Setting date and time...')
-        self.sendrecv('DATE "' + time.strftime('%Y-%m-%d',time.localtime()) + '"') # set the date
-        self.sendrecv('TIME "' + time.strftime('%H:%M:%S',time.localtime()) + '"') # set the time
+        self.dev.write('DATE "' + time.strftime('%Y-%m-%d',time.localtime()) + '"') # set the date
+        self.dev.write('TIME "' + time.strftime('%H:%M:%S',time.localtime()) + '"') # set the time
 
     def lock(self, verbose=False):
         if verbose:
@@ -141,11 +141,11 @@ class TekScope:
         self.dev.write('LOCk NONE')
 
     def get_acquire_state(self):
-        reponse = self.dev.query('ACQ:STATE?')
+        response = self.dev.query('ACQ:STATE?')
         return int(response)
 
     def set_acquire_state(self, running=True):
-        self.dev.write('ACQ:STATE ' + 'START' if running else 'STOP')
+        self.dev.write('ACQ:STATE ' + ('START' if running else 'STOP'))
 
     def close(self):
         self.dev.close()
@@ -153,7 +153,7 @@ class TekScope:
 if __name__ == '__main__':
     scope = TekScope(addr='TCP?*::INSTR', timeout=10)
     manufacturer, model, sn, revision = scope.idn.split(',')
-    assert manufacturer.lower() == 'tektronix'
-    "Device is made by {:s}, not by Tektronix, and is actually a {:s}".format(manufacturer, model)
+    assert manufacturer.lower() == 'tektronix', \
+        "Device is made by {:s}, not by Tektronix, and is actually a {:s}".format(manufacturer, model)
     print('Connected to {} (SN: {})'.format(model, sn))
 
