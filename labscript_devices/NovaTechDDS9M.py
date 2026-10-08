@@ -379,7 +379,7 @@ class NovatechDDS9mWorker(Worker):
         # Set the phase mode:
         self.connection.write(b'%s\r\n'%self.phase_mode_command)
         if self.connection.readline() != b"OK\r\n":
-            raise Exception('Error: Failed to execute command: "%s"'%self.phase_mode.decode('utf8'))
+            raise Exception('Error: Failed to execute command: "%s"'%self.phase_mode_command.decode('utf8'))
         
         #return self.get_current_values()
         

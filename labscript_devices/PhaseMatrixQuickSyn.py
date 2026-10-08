@@ -297,7 +297,6 @@ class QuickSynWorker(Worker):
         
         if results['temperature'] > 50.0:
             raise Exception('WARNING: Temperature is too high! Temperature is %s'%results['temperature'])
-            return results
         
         return results
     
