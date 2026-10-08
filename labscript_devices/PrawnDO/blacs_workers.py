@@ -185,7 +185,7 @@ class PrawnDOWorker(Worker):
     def init(self):
         self.intf = PrawnDOInterface(self.com_port, self.pico_board)        
 
-        self.smart_cache = {'do_table':None, 'reps':None}
+        self.smart_cache = {'pulse_program':None}
 
     def _dict_to_int(self, d):
         """Converts dictionary of outputs to an integer mask.
