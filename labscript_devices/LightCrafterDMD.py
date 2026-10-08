@@ -103,7 +103,7 @@ class ImageSet(Output):
             raise LabscriptError("Your image %s is bitdepth %s, but it needs to be 1 for DMD output %s. Please re-save image in appropriate format."%(path,bitdepth,self.name))
         self.add_instruction(t, raw_data)
             
-    def expand_timeseries(self,all_times):
+    def expand_timeseries(self, *args, **kwargs):
         """We have to override the usual expand_timeseries, as it sees strings as iterables that need flattening!
         Luckily for us, we should only ever have individual data points, as we won't be ramping or anything,
         so this function is a lot simpler than the original, as we have more information about the output.
@@ -286,7 +286,7 @@ class LightCrafterWorker(Worker):
             # We have an error
             errors = ""
             for e in recv['body']:
-                errors+= self.error_messages[e] + "\n"
+                errors+= self.error_messages[bytes([e])] + "\n"
             
             raise Exception("Error(s) in receive packet: %s"%errors)
         
