@@ -36,7 +36,7 @@ class RFBlaster(PseudoclockDevice):
     
     # TODO: find out what these actually are!
     trigger_delay = 873.75e-6
-    wait_day = trigger_delay
+    wait_delay = trigger_delay
     
     @set_passed_properties()
     def __init__(self, name, ip_address, trigger_device=None, trigger_connection=None):
