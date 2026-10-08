@@ -13,9 +13,10 @@ class TekScopeWorker(Worker):
 
         self.scope = TekScope(self.addr, termination=self.termination)
         manufacturer, model, sn, revision = self.scope.idn.split(',')
-        assert manufacturer.lower() == 'tektronix'
-        "Device is made by {:s}, not by Tektronix, and is actually a {:s}".format(
-            manufacturer, model
+        assert manufacturer.lower() == 'tektronix', (
+            "Device is made by {:s}, not by Tektronix, and is actually a {:s}".format(
+                manufacturer, model
+            )
         )
         print('Connected to {} (SN: {})'.format(model, sn))
 
