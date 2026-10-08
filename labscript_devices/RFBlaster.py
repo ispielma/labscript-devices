@@ -315,9 +315,6 @@ class MultiPartForm(object):
         self.form_fields = []
         self.files = []
     
-    def get_content_type(self):
-        return b'multipart/form-data; boundary=%s' % self.boundary
-
     def add_field(self, name, value):
         """Add a simple field to the form data."""
         self.form_fields.append( (name, value) )
